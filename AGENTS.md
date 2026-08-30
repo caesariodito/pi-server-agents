@@ -26,13 +26,14 @@ Never commit secrets or private runtime data:
 - Prefer settings/package refs over vendored installed packages.
 - Keep diffs minimal.
 - Use existing Pi package/install mechanisms when possible.
-- After changing tracked setup, run:
+- After changing tracked setup, use Conventional Commits and run:
   ```bash
   git status --short --ignored
   git add <changed-files>
-  git commit -m '<short message>'
+  git commit -m '<type>(<scope>): <short message>'
   git push
   ```
+- Common commit types: `feat`, `fix`, `docs`, `chore`, `refactor`.
 - Before committing, verify ignored secrets remain ignored:
   ```bash
   git status --short --ignored
