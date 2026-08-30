@@ -1,7 +1,7 @@
 {
   "providers": {
     "9router": {
-      "baseUrl": "http://127.0.0.1:20128/v1",
+      "baseUrl": "http://localhost:20128/v1",
       "api": "openai-completions",
       "apiKey": "!bash -lc '. \"$HOME/.config/9router/env\"; printf %s \"$NINEROUTER_KEY\"'",
       "authHeader": true,

@@ -43,6 +43,9 @@ Add secrets to your shell profile, not this repo:
 export NINEROUTER_URL="http://localhost:20128"
 export NINEROUTER_KEY="sk-..."
 
+# Pi models.json currently uses baseUrl "http://localhost:20128/v1".
+# Keep NINEROUTER_URL equivalent to that host/port on each server.
+
 # Optional Pi process config
 export PI_OFFLINE=0
 export PI_SKIP_VERSION_CHECK=0
