@@ -14,9 +14,25 @@ Not tracked:
 - `sessions/` chat history
 - package/cache dirs reproducible from settings
 
-Restore:
+## Restore on new server
+
+If `~/.pi/agent` does not exist:
 ```bash
-git clone <repo-url> ~/.pi/agent
+mkdir -p ~/.pi
+git clone https://github.com/caesariodito/pi-server-agents ~/.pi/agent
 ```
 
-If Pi is already configured, back up existing `~/.pi/agent` first.
+If `~/.pi/agent` already exists, back it up first:
+```bash
+mkdir -p ~/.pi
+mv ~/.pi/agent ~/.pi/agent.backup.$(date +%Y%m%d-%H%M%S)
+git clone https://github.com/caesariodito/pi-server-agents ~/.pi/agent
+```
+
+If you need old auth secrets, copy them from backup:
+```bash
+ls -ld ~/.pi/agent.backup.*
+cp ~/.pi/agent.backup.YYYYMMDD-HHMMSS/auth.json ~/.pi/agent/auth.json
+```
+
+Do not commit `auth.json` or `sessions/`.
