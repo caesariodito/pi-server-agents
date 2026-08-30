@@ -1,0 +1,24 @@
+# secrets
+auth.json
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+
+# private/noisy runtime state
+sessions/
+logs/
+*.log
+
+# package/cache dirs reproducible from settings
+npm/
+git/
+tmp/
+cache/
+
+# OS/editor
+.DS_Store
+*.swp
+*~
