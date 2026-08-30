@@ -35,4 +35,19 @@ ls -ld ~/.pi/agent.backup.*
 cp ~/.pi/agent.backup.YYYYMMDD-HHMMSS/auth.json ~/.pi/agent/auth.json
 ```
 
-Do not commit `auth.json` or `sessions/`.
+## Environment example
+
+Add secrets to your shell profile, not this repo:
+```bash
+# 9Router
+export NINEROUTER_URL="http://localhost:20128"
+export NINEROUTER_KEY="sk-..."
+
+# Optional Pi process config
+export PI_OFFLINE=0
+export PI_SKIP_VERSION_CHECK=0
+```
+
+If 9Router auth is disabled, omit `NINEROUTER_KEY`.
+
+Do not commit `auth.json`, `.env`, or `sessions/`.
