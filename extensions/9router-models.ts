@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { execFileSync } from "node:child_process";
 
 type RemoteModel = {
   id: string;
@@ -15,9 +16,42 @@ type RemoteModel = {
   };
 };
 
+type NinerouterEnv = {
+  url?: string;
+  key?: string;
+};
+
+function loadNinerouterEnv(): NinerouterEnv {
+  if (process.env.NINEROUTER_URL || process.env.NINEROUTER_KEY) {
+    return {
+      url: process.env.NINEROUTER_URL,
+      key: process.env.NINEROUTER_KEY,
+    };
+  }
+
+  try {
+    const output = execFileSync(
+      "bash",
+      [
+        "-lc",
+        '. "$HOME/.config/9router/env" 2>/dev/null || true; printf "%s\\n%s" "$NINEROUTER_URL" "$NINEROUTER_KEY"',
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
+    );
+    const [url, key] = output.split("\n");
+    return {
+      url: url || undefined,
+      key: key || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export default async function (pi: ExtensionAPI) {
-  const root = (process.env.NINEROUTER_URL || "http://100.70.192.32:20128").replace(/\/$/, "");
-  const key = process.env.NINEROUTER_KEY;
+  const env = loadNinerouterEnv();
+  const root = (env.url || "http://100.70.192.32:20128").replace(/\/$/, "");
+  const key = env.key;
   const response = await fetch(`${root}/v1/models`, {
     headers: key ? { Authorization: `Bearer ${key}` } : {},
     signal: AbortSignal.timeout(10_000),
