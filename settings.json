@@ -2,5 +2,6 @@
   "lastChangelogVersion": "0.84.4",
   "theme": "dark",
   "defaultProvider": "9router",
-  "defaultModel": "engineering-planner"
+  "defaultModel": "cx/gpt-5.6-sol",
+  "defaultThinkingLevel": "medium"
 }
