@@ -9,6 +9,7 @@ auth.json
 
 # private/noisy runtime state
 sessions/
+memory/
 logs/
 *.log
 

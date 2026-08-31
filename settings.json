@@ -3,5 +3,8 @@
   "theme": "dark",
   "defaultProvider": "9router",
   "defaultModel": "cx/gpt-5.6-sol",
-  "defaultThinkingLevel": "medium"
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-memory@0.4.2"
+  ]
 }
