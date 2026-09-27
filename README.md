@@ -14,7 +14,34 @@ Not tracked:
 - `sessions/` chat history
 - package/cache dirs reproducible from settings
 
-## Restore on new server
+## Install on a new server
+
+Requires Linux/macOS, `curl`, and `git`. Run as a normal user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
+```
+
+Installer adds Node.js 24 through nvm, Pi 0.87.1, qmd, this configuration, and configured Pi packages. It prompts for 9Router connection details through `/dev/tty`; existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories are timestamp-backed up.
+
+Safer review-first form:
+
+```bash
+curl -fsSLo /tmp/install-pi.sh https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh
+less /tmp/install-pi.sh
+bash /tmp/install-pi.sh
+```
+
+For unattended installation, provide environment variables without placing secrets directly in shell history:
+
+```bash
+export NINEROUTER_URL="http://localhost:20128"
+read -rsp '9Router key: ' NINEROUTER_KEY; export NINEROUTER_KEY; echo
+curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
+unset NINEROUTER_KEY
+```
+
+## Manual restore
 
 If `~/.pi/agent` does not exist:
 ```bash
