@@ -18,9 +18,19 @@ command -v git >/dev/null || die "git is required."
 install_nvm() {
   local installer
   installer="$(mktemp)"
-  trap 'rm -f "$installer"' RETURN
   curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_INSTALLER_VERSION/install.sh" -o "$installer"
   PROFILE=/dev/null bash "$installer"
+  rm -f "$installer"
+}
+
+ensure_nvm_profile() {
+  local profile="$HOME/.profile"
+  touch "$profile"
+  grep -Fq 'export NVM_DIR="$HOME/.nvm"' "$profile" || cat >> "$profile" <<'EOF'
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+EOF
 }
 
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -28,6 +38,7 @@ if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
   log "Installing nvm $NVM_INSTALLER_VERSION"
   install_nvm
 fi
+ensure_nvm_profile
 # shellcheck source=/dev/null
 . "$NVM_DIR/nvm.sh"
 
