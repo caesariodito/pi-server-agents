@@ -11,7 +11,18 @@ readonly ROUTER_ENV="$HOME/.config/9router/env"
 log() { printf '\n==> %s\n' "$*"; }
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 
-[[ ${EUID:-$(id -u)} -ne 0 ]] || die "Run as a normal user, not root."
+confirm_root_install() {
+  local tty=/dev/tty answer
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || return
+  [[ -r "$tty" && -w "$tty" ]] || die "Root installation requires an interactive terminal."
+  printf '%s\n' \
+    'WARNING: Pi will run with unrestricted machine access.' \
+    'Configuration and Node.js will be installed under /root.' > "$tty"
+  read -r -p "Type ROOT to continue: " answer < "$tty"
+  [[ "$answer" == "ROOT" ]] || die "Root installation cancelled."
+}
+
+confirm_root_install
 command -v curl >/dev/null || die "curl is required."
 command -v git >/dev/null || die "git is required."
 

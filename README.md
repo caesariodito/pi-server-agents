@@ -16,11 +16,13 @@ Not tracked:
 
 ## Install on a new server
 
-Requires Linux/macOS, `curl`, and `git`. Run as a normal user:
+Requires Linux/macOS, `curl`, and `git`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
 ```
+
+Installer supports normal users and root. Root installation prints a warning and requires typing `ROOT` through `/dev/tty`; Pi then has unrestricted machine access, and files are installed under `/root`.
 
 Installer adds Node.js 24 through nvm, Pi 0.87.1, qmd, this configuration, and configured Pi packages. It prompts for 9Router connection details through `/dev/tty`; existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories are timestamp-backed up.
 
