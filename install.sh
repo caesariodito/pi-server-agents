@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
 set -Eeuo pipefail
 
 readonly PI_VERSION="0.87.1"
