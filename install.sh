@@ -14,7 +14,7 @@ die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 
 confirm_root_install() {
   local tty=/dev/tty answer
-  [[ ${EUID:-$(id -u)} -eq 0 ]] || return
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || return 0
   [[ -r "$tty" && -w "$tty" ]] || die "Root installation requires an interactive terminal."
   printf '%s\n' \
     'WARNING: Pi will run with unrestricted machine access.' \
