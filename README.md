@@ -7,6 +7,7 @@ Tracked:
 - `models.json`
 - `models-store.json`
 - `skills/`
+- `home/AGENTS.md` cross-server home instructions
 - `.gitignore`
 
 Not tracked:
@@ -24,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/
 
 Installer supports normal users and root. Root installation prints a warning and requires typing `ROOT` through `/dev/tty`; Pi then has unrestricted machine access, and files are installed under `/root`.
 
-Installer adds Node.js 24 through nvm, Pi 0.87.1, qmd, this configuration, and configured Pi packages. It prompts for 9Router connection details through `/dev/tty`; existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories are timestamp-backed up.
+Installer adds Node.js 24 through nvm, Pi 0.87.1, qmd, this configuration, configured Pi packages, and the generic `home/AGENTS.md` at `~/AGENTS.md`. It prompts for 9Router connection details through `/dev/tty`; existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories and changed home instruction files are timestamp-backed up.
 
 Safer review-first form:
 

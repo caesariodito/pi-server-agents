@@ -10,7 +10,7 @@ Keep small, useful config in git:
 - `models-store.json`
 - `skills/`
 - package/resource manifests when added
-- docs: `README.md`, `AGENTS.md`
+- docs: `README.md`, `AGENTS.md`, `home/AGENTS.md`
 
 ## Do not track
 

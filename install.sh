@@ -86,6 +86,20 @@ else
   git clone "$REPO_URL" "$AGENT_DIR"
 fi
 
+install_home_agents() {
+  local source="$AGENT_DIR/home/AGENTS.md" target="$HOME/AGENTS.md" backup
+  [[ -f "$source" ]] || die "Missing home AGENTS.md template: $source"
+  if [[ -e "$target" ]] && ! cmp -s "$source" "$target"; then
+    backup="$target.backup.$(date +%Y%m%d-%H%M%S)"
+    cp -a "$target" "$backup"
+    printf 'Existing home AGENTS.md backed up to %s\n' "$backup"
+  fi
+  cmp -s "$source" "$target" 2>/dev/null || install -m 644 "$source" "$target"
+}
+
+log "Installing home AGENTS.md"
+install_home_agents
+
 configure_router() {
   local tty=/dev/tty url key
 
