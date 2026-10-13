@@ -26,6 +26,7 @@ Never commit secrets or private runtime data:
 - Prefer settings/package refs over vendored installed packages.
 - Keep diffs minimal.
 - Use existing Pi package/install mechanisms when possible.
+- Preserve Homepage Docker auto-discovery rules from `/home/dito/AGENTS.md` and tracked `home/AGENTS.md`. User-facing Docker services need `homepage.*` Compose labels; infrastructure-only containers stay unlabeled.
 - After changing tracked setup, use Conventional Commits and run:
   ```bash
   git status --short --ignored

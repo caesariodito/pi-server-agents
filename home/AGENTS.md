@@ -44,6 +44,15 @@ Never deploy a Compose project directly under `$HOME`, `/tmp`, or a repository w
 - Verify local DNS zone, tunnel routes, and access policy in stack documentation before changes.
 - Review client compatibility before putting Cloudflare Access in front of an API or native-client service.
 
+## Homepage Docker discovery
+
+- When a central Homepage instance has a configured read-only Docker socket proxy for this host, add discovery labels to every user-facing Docker service.
+- Add `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.href`, and `homepage.description` Compose labels when a useful URL exists. Add `homepage.siteMonitor` when an HTTP health target is suitable.
+- Use host group format `<hostname> · <TAILSCALE_IPV4>` and place labels on the container providing the user-facing service.
+- Do not label infrastructure-only containers, databases without a UI, proxies, tunnels, agents, or sidecars unless they provide a useful user-facing endpoint.
+- Prefer discovery labels over duplicate static Homepage entries. Keep non-Docker services and services invisible to the host Docker daemon as static entries.
+- Verify discovery through the configured socket proxy after deployment. Never expose an unrestricted Docker socket or unauthenticated write-capable Docker API.
+
 ## New deployment procedure
 
 Before creating or changing a deployment, inspect live state and read stack docs:
