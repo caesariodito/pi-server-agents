@@ -8,6 +8,7 @@ Tracked:
 - `models-store.json`
 - `skills/`
 - `home/AGENTS.md` cross-server home instructions
+- `home/tmux.conf` managed tmux configuration
 - `.gitignore`
 
 Not tracked:
@@ -25,7 +26,14 @@ curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/
 
 Installer supports normal users and root. Root installation prints a warning and requires typing `ROOT` through `/dev/tty`; Pi then has unrestricted machine access, and files are installed under `/root`.
 
-Installer adds Node.js 24 through nvm, Pi 0.87.1, qmd, Herdr, this configuration, configured Pi packages, and the generic `home/AGENTS.md` at `~/AGENTS.md`. It prompts for 9Router connection details through `/dev/tty`; existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories and changed home instruction files are timestamp-backed up.
+Installer prompts for one of two modes through `/dev/tty`:
+
+1. **Install/update missing setup** keeps installed tools and fills missing setup.
+2. **Reinstall all** reruns every managed tool installer without deleting user data.
+
+Installer manages Node.js 24 through nvm, Pi 0.87.1, qmd, Herdr, this configuration, configured Pi packages, generic `home/AGENTS.md` at `~/AGENTS.md`, and tmux configuration when tmux is already installed. It does not install or upgrade tmux. Existing `~/.config/9router/env` remains unchanged. Existing non-repository agent directories and changed home files are timestamp-backed up.
+
+Tmux settings live at `~/.config/tmux/pi-server-agents.conf`. Installer preserves existing `~/.tmux.conf` content and adds one `source-file` line, backing up changed config first. It chooses `tmux-256color` when terminfo exists, otherwise `screen-256color`; RGB and optional fzf session picker are capability-gated. Active tmux servers reload without killing sessions. Clipboard uses tmux/OSC 52 and still depends on client terminal and SSH path support.
 
 Safer review-first form:
 
@@ -35,13 +43,29 @@ less /tmp/install-pi.sh
 bash /tmp/install-pi.sh
 ```
 
-For unattended installation, provide environment variables without placing secrets directly in shell history:
+For unattended installation, choose `missing` or `reinstall` and provide environment variables without placing secrets directly in shell history:
 
 ```bash
+export PI_SETUP_MODE=missing
 export NINEROUTER_URL="http://localhost:20128"
 read -rsp '9Router key: ' NINEROUTER_KEY; export NINEROUTER_KEY; echo
 curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
 unset NINEROUTER_KEY
+```
+
+To rerun every managed installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | PI_SETUP_MODE=reinstall bash
+```
+
+## Validate installer changes
+
+```bash
+bash -n install.sh
+tmux -L pi-config-check -f <(printf '%s\n' 'set -g default-terminal "screen-256color"'; cat home/tmux.conf) new-session -d -s validate
+tmux -L pi-config-check kill-session -t validate
+git diff --check
 ```
 
 ## Manual restore
