@@ -6,6 +6,7 @@ readonly PI_VERSION="0.87.1"
 readonly NODE_VERSION="24"
 readonly NVM_INSTALLER_VERSION="v0.40.3"
 readonly REPO_URL="https://github.com/caesariodito/pi-server-agents"
+readonly HERDR_INSTALLER_URL="https://herdr.dev/install.sh"
 readonly AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 readonly ROUTER_ENV="$HOME/.config/9router/env"
 
@@ -64,6 +65,17 @@ npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@$PI_VERSION"
 
 log "Installing qmd"
 npm install -g @tobilu/qmd
+
+log "Installing Herdr"
+herdr_installer="$(mktemp)"
+curl -fsSL "$HERDR_INSTALLER_URL" -o "$herdr_installer"
+HERDR_INSTALL_DIR="$HOME/.local/bin" sh "$herdr_installer"
+rm -f "$herdr_installer"
+export PATH="$HOME/.local/bin:$PATH"
+grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.profile" || cat >> "$HOME/.profile" <<'EOF'
+
+export PATH="$HOME/.local/bin:$PATH"
+EOF
 
 log "Installing Pi configuration"
 mkdir -p "$(dirname "$AGENT_DIR")"
@@ -142,4 +154,5 @@ log "Verifying installation"
 printf 'Node.js: %s\n' "$(node --version)"
 printf 'Pi:      %s\n' "$(pi --version)"
 printf 'qmd:     %s\n' "$(qmd --version 2>/dev/null || printf 'installed')"
+printf 'Herdr:   %s\n' "$(herdr --version)"
 printf '\nSetup complete. Run: cd /path/to/project && pi\n'
