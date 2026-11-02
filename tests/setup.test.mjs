@@ -113,6 +113,19 @@ test('full installer combinations preserve runtime and refuse dirty source',()=>
   }
 });
 
+test('missing unzip uses scoped noninteractive sudo and stops before download when denied',()=>{
+  const home=temp();try{
+    const env=ovisFixture(home);
+    writeFileSync(join(home,'bin/apt-get'),'#!/bin/bash\nexit 99\n',{mode:0o700});
+    writeFileSync(join(home,'bin/sudo'),'#!/bin/bash\nprintf "%s\\n" "$*" > "$HOME/sudo-call"\nexit 1\n',{mode:0o700});
+    const script=join(source,'scripts/install-ovis.sh');
+    const r=run('bash',['-c','command() { if [[ "$1" == -v && ( "$2" == unzip || "$2" == bun ) ]]; then return 1; fi; builtin command "$@"; }; source "$1" v0.4.21','test',script],env);
+    assert.notEqual(r.status,0);assert.match(r.stderr,/interactive authentication/);
+    assert.equal(readFileSync(join(home,'sudo-call'),'utf8').trim(),'-n apt-get install -y --no-install-recommends unzip');
+    assert.ok(!readFileSync(join(home,'calls'),'utf8').includes('plugin install'));
+  }finally{rmSync(home,{recursive:true,force:true});}
+});
+
 test('Ovis refuses old tools, malformed plugin state, and existing public bind',()=>{
   for(const options of [{version:'herdr 0.8.0'},{bun:'1.3.0'},{plugins:'{}'},{public:true}]){
     const home=temp();try{

@@ -8,7 +8,15 @@ minimum() {
 minimum "$(herdr --version)" 0.9.0 || fail 'Herdr >=0.9.0 required; upgrade explicitly. Existing server was not restarted.'
 export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 if ! command -v bun >/dev/null; then
-  command -v unzip >/dev/null || fail 'Missing unzip required by Bun installer. Install unzip with approved OS package manager, then rerun; no packages installed automatically.'
+  if ! command -v unzip >/dev/null; then
+    command -v apt-get >/dev/null || fail 'Missing unzip. Install it with OS package manager, then rerun.'
+    if [[ "$EUID" == 0 ]]; then
+      apt-get install -y --no-install-recommends unzip
+    else
+      command -v sudo >/dev/null || fail 'Missing unzip and sudo. Ask administrator to install unzip.'
+      sudo -n apt-get install -y --no-install-recommends unzip || fail 'Could not install unzip without interactive authentication. Run: sudo apt-get install --no-install-recommends unzip; then rerun.'
+    fi
+  fi
   installer="$(mktemp)"
   trap 'rm -f "$installer"' EXIT
   curl -fsSL https://bun.sh/install -o "$installer"

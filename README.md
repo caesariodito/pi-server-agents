@@ -53,7 +53,7 @@ No flags authorize Tailscale configuration, public binding, relay, pairing, or r
 
 Daily workflow adds pinned `rpiv-ask-user-question@2.12.0`, `rpiv-todo@2.12.0`, and `pi-web-access@0.45.0`, plus curated lifecycle, project-init, Herdr, security-audit, frontend craft, and optional review skills. No Mac browser profiles, credentials, caches, installed dependencies, or machine .NET instructions. HTML review tools require Python 3 when used; Mermaid remains a separately installed optional pinned dependency, never a base installer step. Full audits still require independent authorized agents and strict OS sandbox controls; installing the skill does not provision these.
 
-Missing Bun installation requires `unzip`; installer reports missing prerequisite instead of installing OS packages or invoking sudo. Install it separately with explicit approval.
+Missing Bun installation requires `unzip`. Selecting Ovis authorizes installing this prerequisite on apt-based hosts with `sudo -n apt-get install -y --no-install-recommends unzip` (direct apt-get when root). No automatic package-index update. If sudo needs authentication, installer stops and asks you to run `sudo apt-get install --no-install-recommends unzip` manually, then rerun. Other OS package managers remain manual.
 
 Ovis uses Herdr plugin **v0.4.21** on first installation and installs missing Bun **1.4.0**. Existing Bun must be >=1.4.0. Existing Ovis checkout/config remains user-owned; installer does not replace or update it. Public/custom listener or relay configuration stops automatic setup for manual review. Fresh listener is `127.0.0.1:7317`.
 

@@ -78,7 +78,7 @@ case "${PI_SETUP_MODE:-}" in ''|missing|reinstall) ;; *) die "PI_SETUP_MODE must
 confirm_root_install
 choose_setup_mode
 choose_feature PI_SETUP_DAILY_WORKFLOW 'Install daily coding workflow?'
-choose_feature PI_SETUP_OVIS 'Install Ovis for mobile access (includes missing Bun; no network exposure)?'
+choose_feature PI_SETUP_OVIS 'Install Ovis for mobile access (includes missing Bun and apt unzip; no network exposure)?'
 choose_feature PI_SETUP_QMD 'Install optional qmd search tool?'
 readonly SETUP_MODE
 printf 'Setup mode: %s\n' "$SETUP_MODE"
