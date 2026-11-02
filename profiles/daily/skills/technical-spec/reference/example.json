@@ -1,0 +1,412 @@
+{
+  "title": "Example Sync Technical Specification",
+  "doc_type": "technical-spec",
+  "status": "in-review",
+  "version": "0.1",
+  "updated": "2026-10-19",
+  "owner": "Owner",
+  "reviewers": [
+    "Reviewer"
+  ],
+  "links": {
+    "implementation plan": "./implementation-plan.html"
+  },
+  "tagline": "Reliable event ingestion into structured records.",
+  "overview": {
+    "purpose": "Ingest signed events and persist normalized records.",
+    "context": "Webhook source retries delivery; storage lacks transactions.",
+    "boundaries": [
+      "Includes ingestion and persistence",
+      "Excludes reporting UI"
+    ],
+    "principles": [
+      "Persist raw event before parsing",
+      "Ambiguity becomes review state"
+    ]
+  },
+  "flows": [
+    {
+      "id": "TS-01",
+      "kind": "flowchart",
+      "title": "Business flow",
+      "tldr": "Operator submits, system validates, reviewer consumes.",
+      "steps": [
+        {
+          "actor": "Operator",
+          "action": "Submit form",
+          "outcome": "Record or error"
+        },
+        {
+          "actor": "System",
+          "action": "Normalize and store",
+          "outcome": "Structured record"
+        }
+      ]
+    },
+    {
+      "id": "TS-02",
+      "kind": "sequence",
+      "title": "Runtime sequence",
+      "tldr": "Raw event commits before normalized record.",
+      "participants": [
+        "Source",
+        "Bot",
+        "Store"
+      ],
+      "messages": [
+        {
+          "from": "Source",
+          "to": "Bot",
+          "label": "Signed webhook"
+        },
+        {
+          "from": "Bot",
+          "to": "Store",
+          "label": "Append raw"
+        },
+        {
+          "from": "Bot",
+          "to": "Store",
+          "label": "Save record"
+        }
+      ]
+    },
+    {
+      "id": "TS-03",
+      "kind": "data-flow",
+      "title": "Pipeline",
+      "tldr": "Failures stop at owning stage.",
+      "stages": [
+        {
+          "name": "Verify",
+          "input": "Webhook",
+          "process": "Signature",
+          "output": "Trusted event",
+          "on_error": "Reject"
+        },
+        {
+          "name": "Parse",
+          "input": "Trusted event",
+          "process": "Normalize fields",
+          "output": "Record",
+          "on_error": "Review state"
+        }
+      ]
+    }
+  ],
+  "architecture": {
+    "tldr": "Core depends on three ports.",
+    "components": [
+      {
+        "id": "C1",
+        "name": "Core",
+        "responsibility": "Validate and normalize",
+        "depends_on": [
+          "MessageSource",
+          "Store",
+          "Notifier"
+        ]
+      }
+    ],
+    "ports": [
+      {
+        "name": "MessageSource",
+        "direction": "in",
+        "operations": [
+          "Receive"
+        ],
+        "implemented_by": "Webhook adapter"
+      },
+      {
+        "name": "Store",
+        "direction": "out",
+        "operations": [
+          "AppendRaw",
+          "Save"
+        ],
+        "implemented_by": "Sheet adapter"
+      },
+      {
+        "name": "Notifier",
+        "direction": "out",
+        "operations": [
+          "Reply"
+        ],
+        "implemented_by": "Gateway adapter"
+      }
+    ],
+    "constraints": [
+      "One serialized writer"
+    ]
+  },
+  "contracts": [
+    {
+      "id": "CT-01",
+      "title": "Webhook",
+      "tldr": "Signed event identity drives dedupe.",
+      "type": "webhook",
+      "source": "Provider OpenAPI",
+      "inputs": [
+        {
+          "field": "id",
+          "type": "text",
+          "required": true,
+          "authority": "Payload",
+          "rule": "Unique dedupe key"
+        }
+      ],
+      "outputs": [
+        {
+          "field": "status",
+          "type": "HTTP",
+          "meaning": "2xx after durable acceptance"
+        }
+      ],
+      "errors": [
+        {
+          "condition": "Bad signature",
+          "outcome": "401; no persistence"
+        }
+      ],
+      "example": "{\"id\":\"synthetic-1\"}"
+    }
+  ],
+  "data_model": {
+    "tldr": "Raw transport and business records stay separate.",
+    "note": "Logical model.",
+    "entities": [
+      {
+        "name": "raw_event",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "text",
+            "key": "PK",
+            "nullable": false,
+            "invariant": "Unique"
+          }
+        ]
+      },
+      {
+        "name": "record",
+        "fields": [
+          {
+            "name": "record_id",
+            "type": "text",
+            "key": "PK"
+          },
+          {
+            "name": "event_id",
+            "type": "text",
+            "key": "FK"
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "from": "raw_event",
+        "to": "record",
+        "label": "produces 0..1"
+      }
+    ],
+    "invariants": [
+      "One record per accepted event"
+    ]
+  },
+  "processing_rules": [
+    {
+      "id": "PR-01",
+      "title": "Dedupe before parse",
+      "tldr": "Repeated event IDs do not create rows.",
+      "inputs": [
+        "event_id"
+      ],
+      "steps": [
+        "Lookup event ID",
+        "Return prior outcome when found",
+        "Parse only new event"
+      ],
+      "output": "One durable outcome",
+      "failure": "Store failure causes retry",
+      "tests": [
+        "Duplicate delivery"
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "id": "EX-01",
+      "title": "Normalization",
+      "tldr": "Shows authority for derived ID.",
+      "input": "FORM EXAMPLE\nVALUE: A",
+      "columns": [
+        "Field",
+        "Value",
+        "Authority"
+      ],
+      "rows": [
+        [
+          "record_id",
+          "REC-000001",
+          "Persisted counter"
+        ],
+        [
+          "value",
+          "A",
+          "VALUE key"
+        ]
+      ],
+      "notes": [
+        "Synthetic data"
+      ]
+    }
+  ],
+  "reliability": {
+    "tldr": "Retries remain idempotent.",
+    "failure_modes": [
+      {
+        "failure": "Store quota",
+        "detection": "API response",
+        "response": "Bounded retry",
+        "data_safety": "No new ID on retry"
+      }
+    ],
+    "concurrency": [
+      "Single writer"
+    ],
+    "recovery": [
+      "Restart from persisted counter"
+    ],
+    "limits": [
+      {
+        "limit": "Write quota",
+        "ceiling": "Measured in shadow mode",
+        "upgrade_trigger": "Sustained errors"
+      }
+    ]
+  },
+  "security_privacy": {
+    "tldr": "Authenticate source and minimize retained data.",
+    "trust_boundaries": [
+      {
+        "boundary": "Webhook",
+        "control": "Signature + source allowlist"
+      }
+    ],
+    "sensitive_data": [
+      {
+        "data": "Raw text",
+        "location": "raw_event",
+        "retention": "30 days",
+        "access": "Owner"
+      }
+    ],
+    "secrets": [
+      "Signature secret from runtime environment"
+    ],
+    "abuse_cases": [
+      {
+        "case": "Replay",
+        "mitigation": "Event ID dedupe"
+      }
+    ]
+  },
+  "verification": {
+    "tests": [
+      {
+        "layer": "Ingress",
+        "scenario": "Bad signature",
+        "expected": "401 and no row"
+      },
+      {
+        "layer": "Core",
+        "scenario": "Duplicate ID",
+        "expected": "No duplicate record"
+      }
+    ],
+    "metrics": [
+      {
+        "metric": "write_failures_total",
+        "meaning": "Store health",
+        "alert": "Any unrecovered failure"
+      }
+    ],
+    "fixtures": [
+      "Synthetic signed payload"
+    ],
+    "gates": [
+      "Zero duplicate records"
+    ]
+  },
+  "decisions": [
+    {
+      "id": "TD-01",
+      "title": "Serialize writes",
+      "tldr": "One writer orders IDs and rows.",
+      "status": "Proposed",
+      "affects": [
+        "C1",
+        "CT-01"
+      ],
+      "fields": [
+        {
+          "label": "Why",
+          "text": "Storage writes are not atomic."
+        }
+      ],
+      "options": [
+        {
+          "value": "serialize",
+          "title": "Serialize writes",
+          "why": "Avoid races.",
+          "recommended": true
+        },
+        {
+          "value": "parallel",
+          "title": "Write concurrently",
+          "why": "Less code; race risk."
+        }
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "TQ1",
+      "question": "What write ceiling triggers database migration?",
+      "owner": "Owner",
+      "due": "Before rollout",
+      "blocks": "TD-01",
+      "evidence": [
+        {
+          "label": "Gap",
+          "text": "No production baseline."
+        }
+      ],
+      "options": [
+        {
+          "value": "measure",
+          "title": "Measure in shadow mode",
+          "why": "Uses observed load.",
+          "recommended": true
+        },
+        {
+          "value": "fixed",
+          "title": "Set fixed threshold now",
+          "why": "Earlier clarity; guessed value."
+        }
+      ]
+    }
+  ],
+  "change_log": [
+    {
+      "version": "0.1",
+      "date": "2026-10-19",
+      "change": "First draft."
+    }
+  ],
+  "guides": {
+    "flows": "Keep raw persistence before parsing visible.",
+    "data_model": "Show logical ownership, not storage convenience."
+  }
+}

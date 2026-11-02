@@ -18,6 +18,12 @@ npm/
 git/
 tmp/
 cache/
+.scratch/
+daily-skills/
+node_modules/
+__pycache__/
+*.backup.*
+.daily-workflow
 
 # OS/editor
 .DS_Store

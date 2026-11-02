@@ -1,0 +1,464 @@
+{
+  "title": "Inventory Sync v1",
+  "doc_type": "implementation-plan",
+  "status": "in-review",
+  "version": "0.4",
+  "updated": "2026-10-20",
+  "owner": "Your name",
+  "reviewers": [
+    "Reviewer A",
+    "Reviewer B"
+  ],
+  "links": {
+    "prd": "#",
+    "board": "#",
+    "repo": "#",
+    "technical spec": "./technical-spec.html"
+  },
+  "current_phase": 1,
+  "key": "inventory-sync-v1-review-2026-10-20-v04",
+  "answers_filename": "inventory-sync-v1-answers.md",
+  "tagline": "One source of truth for stock across the webstore, Shopee and Tokopedia.",
+  "summary": {
+    "building": "A sync service that records every stock movement in one ledger and pushes the result to all sales channels.",
+    "so_that": "We stop overselling: 38 orders were cancelled last month because the same unit sold on two channels.",
+    "done_when": "DoD-1 to DoD-5 verified; G1 and G2 checked 2 weeks after full rollout.",
+    "biggest_risk": "Year-end volume arrives before rollout ends. Mitigated by staged channel enablement (D-03) and buffer stock (D-04).",
+    "now": "Phase 1 of 4, Foundation. DoD-1 verified; 2 days over the original estimate."
+  },
+  "business_context": {
+    "problem": "Ops updates stock by hand in each channel seller dashboard, twice a day, from a shared spreadsheet. Between updates, the last unit of a SKU can sell on two channels at once.",
+    "affected": [
+      {
+        "group": "Ops team",
+        "impact": "3 people spend about 2 hours a day on manual stock edits."
+      },
+      {
+        "group": "Customers",
+        "impact": "38 orders were cancelled last month after payment."
+      },
+      {
+        "group": "Sales",
+        "impact": "Repeated cancellations risk reduced visibility or delisting."
+      }
+    ],
+    "why_now": "Year-end sales run at roughly 3× normal volume starting December. At that volume the manual process breaks completely.",
+    "glossary": [
+      {
+        "term": "SKU",
+        "meaning": "One sellable variant; stock is tracked per SKU."
+      },
+      {
+        "term": "Oversell",
+        "meaning": "Selling more units than physically available, forcing a cancellation."
+      },
+      {
+        "term": "Drift",
+        "meaning": "Difference between ledger stock and channel stock."
+      }
+    ]
+  },
+  "goals_scope": {
+    "goal": "Ops and customers see the same stock on every channel within a minute, so the last unit never sells twice.",
+    "outcomes": [
+      {
+        "id": "G1",
+        "goal": "Oversell cancellations",
+        "baseline": "38 / month",
+        "target": "< 2 / month",
+        "measured_by": "Cancellation-reason report",
+        "check_on": "2 weeks after all channels are enabled"
+      },
+      {
+        "id": "G2",
+        "goal": "Stock propagation, p95",
+        "baseline": "~6 h",
+        "target": "≤ 60 s",
+        "measured_by": "sync_lag_seconds",
+        "check_on": "1 week after Tokopedia is enabled"
+      }
+    ],
+    "definition_of_done": [
+      {
+        "id": "DoD-1",
+        "condition": "Ledger migrations apply and roll back cleanly on a staging copy of production data (`make migrate-roundtrip`).",
+        "verified_by": "CI job `migrate-roundtrip` on staging",
+        "evidence": "CI run 412 passed on 2026-10-18; log linked on the board card.",
+        "status": "verified"
+      },
+      {
+        "id": "DoD-2",
+        "condition": "Replaying 30 days of recorded channel orders in shadow mode produces 0 unexplained drift rows (`python -m sync.replay --days 30`).",
+        "verified_by": "Replay job output, reviewed by the Ops lead",
+        "evidence": "",
+        "status": "open"
+      },
+      {
+        "id": "DoD-3",
+        "condition": "Technical release gates in technical-spec §10 pass.",
+        "verified_by": "Gate checklist in the technical spec, signed by the tech lead",
+        "evidence": "",
+        "status": "open"
+      },
+      {
+        "id": "DoD-4",
+        "condition": "All three channels are enabled per Section 8 and Ops has stopped editing the spreadsheet.",
+        "verified_by": "Ops lead sign-off",
+        "evidence": "",
+        "status": "open"
+      },
+      {
+        "id": "DoD-5",
+        "condition": "Runbook for drift alerts and rollback is handed to Ops on-call and walked through once.",
+        "verified_by": "On-call lead acknowledgement",
+        "evidence": "",
+        "status": "open"
+      }
+    ],
+    "in_scope": [
+      "Stock sync for webstore, Shopee, and Tokopedia",
+      "Reserve stock when an order is placed",
+      "Nightly reconciliation"
+    ],
+    "out_of_scope": [
+      "Price sync",
+      "Product listing edits",
+      "Bin locations"
+    ],
+    "later": [
+      "Multiple warehouses",
+      "Low-stock alerts"
+    ]
+  },
+  "system_shape": {
+    "today": [
+      "Orders arrive on each channel independently",
+      "⚠️ Ops reads a shared spreadsheet updated twice a day",
+      "⚠️ Ops edits three seller dashboards manually"
+    ],
+    "after": [
+      "Orders arrive on each channel independently",
+      "🆕 One stock ledger reserves units as orders arrive",
+      "🆕 Every channel receives updated stock automatically"
+    ],
+    "technical_spec": {
+      "label": "Technical spec",
+      "href": "./technical-spec.html"
+    }
+  },
+  "modules": [
+    {
+      "id": "M1",
+      "title": "Stock ledger",
+      "tldr": "Every stock change is recorded in one place and reservations work on staging.",
+      "phase": 1,
+      "status": "In progress",
+      "owner": "Your name",
+      "delivers": "Ledger and reservation API running on staging",
+      "depends_on": "Phase 0 rate-limit findings",
+      "exit_criteria": "DoD-1 verified; reservation API deployed to staging",
+      "technical_refs": ["CT-01", "PR-01", "TD-01"]
+    },
+    {
+      "id": "M2",
+      "title": "Channel adapters",
+      "tldr": "Orders from all three channels reach the ledger in shadow mode.",
+      "phase": 2,
+      "status": "Not started",
+      "owner": "Backend engineer",
+      "delivers": "Adapters for webstore, Shopee, and Tokopedia running in shadow mode",
+      "depends_on": "Marketplace API credentials from Ops; M1 on staging",
+      "exit_criteria": "DoD-2 replay passes for all three channels",
+      "technical_refs": ["CT-02", "PR-02"]
+    },
+    {
+      "id": "M3",
+      "title": "Push workers",
+      "tldr": "Channels receive updated stock within a minute without hitting rate limits.",
+      "phase": 2,
+      "status": "Not started",
+      "owner": "Backend engineer",
+      "delivers": "Push workers writing stock to channels in shadow mode",
+      "depends_on": "M1 on staging; buffer size from Q2",
+      "exit_criteria": "7 days of shadow pushes with p95 lag ≤ 60 s",
+      "technical_refs": ["TS-02", "PR-03"]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-01",
+      "title": "One warehouse in v1",
+      "tldr": "v1 syncs stock for the main warehouse only.",
+      "affects": [
+        "M1",
+        "M2"
+      ],
+      "status": "Accepted",
+      "fields": [
+        {
+          "label": "Why",
+          "text": "All channel stock ships from the main warehouse today."
+        },
+        {
+          "label": "Cost",
+          "text": "The returns shelf stays on the spreadsheet until v2."
+        },
+        {
+          "label": "Revisit if",
+          "text": "A second warehouse starts fulfilling channel orders."
+        }
+      ]
+    },
+    {
+      "id": "D-03",
+      "title": "Channel enablement order",
+      "tldr": "Enable channels one at a time, lowest-risk first.",
+      "affects": [
+        "M2",
+        "M3",
+        "P3"
+      ],
+      "status": "Proposed",
+      "fields": [
+        {
+          "label": "Why",
+          "text": "A bad push on the webstore is reversible in minutes; a marketplace penalty is not."
+        }
+      ],
+      "options": [
+        {
+          "value": "staged",
+          "title": "Webstore, then Shopee, then Tokopedia",
+          "why": "Each step proves the next; adds about 4 days to phase 3.",
+          "recommended": true
+        },
+        {
+          "value": "together",
+          "title": "Enable all three together",
+          "why": "Fastest, but one failure hits every channel during year-end ramp-up."
+        },
+        {
+          "value": "marketplaces-first",
+          "title": "Marketplaces first",
+          "why": "Fixes most oversells soonest, but tests first on the least forgiving channels."
+        }
+      ]
+    },
+    {
+      "id": "D-04",
+      "title": "Buffer stock per channel",
+      "tldr": "Hide a few units per marketplace so sync delay cannot oversell the last unit.",
+      "affects": [
+        "M3"
+      ],
+      "status": "Accepted",
+      "fields": [
+        {
+          "label": "Cost",
+          "text": "A channel can show sold out while one unit remains."
+        },
+        {
+          "label": "Revisit if",
+          "text": "Lost sales exceed cancellations prevented."
+        }
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "number": 0,
+      "title": "Spike",
+      "delivers": "Measured API limits and webhook behavior",
+      "exit_criteria": "Limits documented in the technical spec",
+      "covers": [],
+      "plan": "3 d",
+      "actual": "4 d",
+      "status": "Done",
+      "progress": 100
+    },
+    {
+      "number": 1,
+      "title": "Foundation",
+      "delivers": "M1 ledger and reservation API",
+      "exit_criteria": "Reversible migrations; staging deploy",
+      "covers": ["DoD-1"],
+      "plan": "1.5 w",
+      "actual": "+2 d expected",
+      "status": "In progress",
+      "progress": 55
+    },
+    {
+      "number": 2,
+      "title": "Channels",
+      "delivers": "M2 adapters and M3 workers in shadow mode",
+      "exit_criteria": "7 days with p95 lag ≤ 60 s and no unexplained drift",
+      "covers": ["DoD-2", "DoD-3"],
+      "plan": "2 w",
+      "actual": "",
+      "status": "Not started"
+    },
+    {
+      "number": 3,
+      "title": "Rollout",
+      "delivers": "Reconciliation, admin view, and channel enablement",
+      "exit_criteria": "All channels enabled; ops retires spreadsheet",
+      "covers": ["DoD-4", "DoD-5"],
+      "plan": "1 w + 2 w watch",
+      "actual": "",
+      "status": "Not started"
+    }
+  ],
+  "risks_assumptions": {
+    "risks": [
+      {
+        "risk": "Year-end volume starts before phase 3 finishes",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Freeze scope after phase 1; enable webstore first so the busiest channel is covered early",
+        "owner": "Your name"
+      },
+      {
+        "risk": "Ops keeps editing dashboards by hand after enablement",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Remove dashboard stock-edit rights per channel at enablement; Ops lead signs DoD-4",
+        "owner": "Ops lead"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Both marketplaces allow stock updates at our seller tier.",
+        "status": "Verified",
+        "verify_by": "2026-10-10",
+        "owner": "Your name"
+      },
+      {
+        "assumption": "Order volume stays below 10k/day for 6 months.",
+        "status": "Unverified",
+        "verify_by": "2026-11-15",
+        "owner": "Sales lead"
+      }
+    ]
+  },
+  "rollout_rollback": {
+    "steps": [
+      {
+        "label": "Seed",
+        "text": "Import spreadsheet stock; diff every SKU before go-live."
+      },
+      {
+        "label": "Shadow mode",
+        "text": "Compute and log pushes without writing channels."
+      },
+      {
+        "label": "Flags",
+        "text": "Enable channels independently in the order chosen in D-03."
+      },
+      {
+        "label": "Rollback",
+        "text": "Disable affected flag; ops resumes spreadsheet; ledger keeps recording."
+      }
+    ],
+    "point_of_no_return": "Ops stops maintaining the spreadsheet, after 2 clean weeks and explicit sign-off."
+  },
+  "observability": {
+    "metrics": [
+      {
+        "metric": "sync_lag_seconds",
+        "tracks_goal": ["G2"],
+        "alert_when": "p95 > 120 s for 10 min"
+      },
+      {
+        "metric": "oversell_cancellations",
+        "tracks_goal": ["G1"],
+        "alert_when": "More than 1 in any 7-day window"
+      }
+    ]
+  },
+  "open_questions": [
+    {
+      "id": "Q1",
+      "question": "Who owns drift alerts after hand-over?",
+      "owner": "Your name",
+      "due": "2026-10-24",
+      "blocks": "DoD-5",
+      "evidence": [
+        {
+          "label": "Gap",
+          "text": "Ops on-call has no engineering access today; engineering on-call has no channel dashboard access."
+        }
+      ],
+      "options": [
+        {
+          "value": "ops",
+          "title": "Ops on-call, with an engineering escalation path",
+          "why": "Ops can pause a channel flag immediately; needs a short runbook.",
+          "recommended": true
+        },
+        {
+          "value": "engineering",
+          "title": "Engineering on-call",
+          "why": "Can fix root causes, but cannot see channel dashboards today."
+        }
+      ]
+    },
+    {
+      "id": "Q2",
+      "question": "How should channel buffer size be calculated?",
+      "owner": "Ops lead",
+      "due": "2026-10-28",
+      "blocks": "Phase 2",
+      "evidence": [
+        {
+          "label": "Trade-off",
+          "text": "Larger buffers prevent more oversells but hide sellable stock."
+        }
+      ],
+      "options": [
+        {
+          "value": "fixed-2",
+          "title": "Fixed 2 units",
+          "why": "Easy to explain and operate for v1.",
+          "recommended": true
+        },
+        {
+          "value": "percentage",
+          "title": "Percentage of stock",
+          "why": "Scales with inventory but needs minimum and rounding rules."
+        }
+      ]
+    }
+  ],
+  "change_log": [
+    {
+      "version": "0.4",
+      "date": "2026-10-20",
+      "change": "Added goal, outcome IDs, and definition of done; workstreams now name owner, delivery, and technical-spec IDs; moved technical decisions and questions to the technical spec."
+    },
+    {
+      "version": "0.3",
+      "date": "2026-10-19",
+      "change": "Closed phase 0; added rate-limit findings; updated phase 1 estimate; drafted D-03."
+    },
+    {
+      "version": "0.2",
+      "date": "2026-10-12",
+      "change": "Added D-04 after ops review; moved multi-warehouse to Later."
+    },
+    {
+      "version": "0.1",
+      "date": "2026-10-08",
+      "change": "First draft."
+    }
+  ],
+  "guides": {
+    "summary": "Five jargon-free lines: build, business outcome, done-when by ID, biggest risk, current phase.",
+    "goals_scope": "Outcomes are measured later and never block delivery. Each DoD item is binary, names a verifier, and records evidence once verified. Typical set: functional acceptance, technical release gates, rollout complete, runbook handed over, owner sign-off.",
+    "modules": "Each workstream names an accountable owner, an observable delivery, dependencies, a checkable exit, and technical-spec IDs instead of technical detail.",
+    "decisions": "Plan decisions cover scope, ownership, budget, schedule, rollout, hosting or procurement, and process adoption. Technical choices go to the technical spec as TD.",
+    "phases": "Exit criteria must be independently checkable. Covers lists the DoD IDs each phase satisfies; every DoD item belongs to one phase.",
+    "risks_assumptions": "Plan risks cover adoption, staffing, timing, dependencies, approvals, and operational readiness. An unverified assumption past its verify-by date moves to the risk table.",
+    "observability": "Only metrics that track an outcome target. Technical metrics live in the technical spec.",
+    "open_questions": "Every question needs an owner, due date, blocked item, evidence, and actionable choices. Technical questions go to the technical spec as TQ."
+  }
+}

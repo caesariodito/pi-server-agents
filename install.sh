@@ -2,13 +2,16 @@
 # curl -fsSL https://raw.githubusercontent.com/caesariodito/pi-server-agents/main/install.sh | bash
 set -Eeuo pipefail
 
-readonly PI_VERSION="0.87.1"
+readonly PI_VERSION="1.4.0"
+readonly OVIS_VERSION="v0.4.21"
 readonly NODE_VERSION="24"
 readonly NVM_INSTALLER_VERSION="v0.40.3"
 readonly REPO_URL="https://github.com/caesariodito/pi-server-agents"
 readonly HERDR_INSTALLER_URL="https://herdr.dev/install.sh"
 readonly AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+readonly SOURCE_DIR="$HOME/.local/share/pi-server-agents"
 readonly ROUTER_ENV="$HOME/.config/9router/env"
+export PI_CODING_AGENT_DIR="$AGENT_DIR"
 readonly TMUX_CONFIG="$HOME/.config/tmux/pi-server-agents.conf"
 
 log() { printf '\n==> %s\n' "$*"; }
@@ -22,7 +25,7 @@ choose_setup_mode() {
     *) die "PI_SETUP_MODE must be 'missing' or 'reinstall'." ;;
   esac
 
-  if [[ ! -r "$tty" || ! -w "$tty" ]]; then
+  if ! ( : <> "$tty" ) 2>/dev/null; then
     SETUP_MODE=missing
     return
   fi
@@ -44,7 +47,7 @@ choose_setup_mode() {
 confirm_root_install() {
   local tty=/dev/tty answer
   [[ ${EUID:-$(id -u)} -eq 0 ]] || return 0
-  [[ -r "$tty" && -w "$tty" ]] || die "Root installation requires an interactive terminal."
+  ( : <> "$tty" ) 2>/dev/null || die "Root installation requires an interactive terminal."
   printf '%s\n' \
     'WARNING: Pi will run with unrestricted machine access.' \
     'Configuration and Node.js will be installed under /root.' > "$tty"
@@ -52,8 +55,31 @@ confirm_root_install() {
   [[ "$answer" == "ROOT" ]] || die "Root installation cancelled."
 }
 
+choose_feature() {
+  local name="$1" prompt="$2" value="${!1:-}" answer
+  case "$value" in
+    0|1) ;;
+    '')
+      value=0
+      if ( : <> /dev/tty ) 2>/dev/null; then
+        read -r -p "$prompt [y/N] " answer < /dev/tty
+        case "$answer" in y|Y|yes|YES) value=1 ;; esac
+      fi ;;
+    *) die "$name must be 0 or 1." ;;
+  esac
+  printf -v "$name" '%s' "$value"
+}
+
+# Validate flags before even root confirmation or tool installation.
+for flag in PI_SETUP_DAILY_WORKFLOW PI_SETUP_OVIS PI_SETUP_QMD; do
+  case "${!flag:-}" in ''|0|1) ;; *) die "$flag must be 0 or 1." ;; esac
+done
+case "${PI_SETUP_MODE:-}" in ''|missing|reinstall) ;; *) die "PI_SETUP_MODE must be 'missing' or 'reinstall'." ;; esac
 confirm_root_install
 choose_setup_mode
+choose_feature PI_SETUP_DAILY_WORKFLOW 'Install daily coding workflow?'
+choose_feature PI_SETUP_OVIS 'Install Ovis for mobile access (includes missing Bun; no network exposure)?'
+choose_feature PI_SETUP_QMD 'Install optional qmd search tool?'
 readonly SETUP_MODE
 printf 'Setup mode: %s\n' "$SETUP_MODE"
 command -v curl >/dev/null || die "curl is required."
@@ -97,18 +123,23 @@ fi
 nvm alias default "$NODE_VERSION" >/dev/null
 nvm use "$NODE_VERSION" >/dev/null
 
+version_at_least() {
+  node -e 'const parse=s=>{const m=s.match(/(?:^|\s|v)(\d+)\.(\d+)\.(\d+)(?:\s|$)/);if(!m)process.exit(2);return m.slice(1).map(Number)};const a=parse(process.argv[1]),b=parse(process.argv[2]);for(let i=0;i<3;i++){if(a[i]>b[i])process.exit(0);if(a[i]<b[i])process.exit(1)}' "$1" "$2"
+}
+
 if [[ "$SETUP_MODE" == reinstall ]] || ! command -v pi >/dev/null; then
   log "Installing Pi $PI_VERSION"
   npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@$PI_VERSION"
 else
-  log "Keeping existing Pi"
+  version_at_least "$(pi --version)" "$PI_VERSION" || die "Existing Pi must be >= $PI_VERSION. Upgrade explicitly or choose reinstall."
+  log "Keeping existing compatible Pi"
 fi
 
-if [[ "$SETUP_MODE" == reinstall ]] || ! command -v qmd >/dev/null; then
+if [[ "$PI_SETUP_QMD" == 1 ]] && { [[ "$SETUP_MODE" == reinstall ]] || ! command -v qmd >/dev/null; }; then
   log "Installing qmd"
   npm install -g @tobilu/qmd
 else
-  log "Keeping existing qmd"
+  log "Leaving optional qmd unchanged"
 fi
 
 export PATH="$HOME/.local/bin:$PATH"
@@ -126,34 +157,29 @@ grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.profile" || cat >> "$HOM
 export PATH="$HOME/.local/bin:$PATH"
 EOF
 
-log "Installing Pi configuration"
-mkdir -p "$(dirname "$AGENT_DIR")"
-if [[ -d "$AGENT_DIR/.git" ]]; then
-  origin="$(git -C "$AGENT_DIR" remote get-url origin 2>/dev/null || true)"
-  if [[ "$origin" == "$REPO_URL" || "$origin" == "$REPO_URL.git" ]]; then
-    git -C "$AGENT_DIR" pull --ff-only
-  else
-    backup="$AGENT_DIR.backup.$(date +%Y%m%d-%H%M%S)"
-    mv "$AGENT_DIR" "$backup"
-    printf 'Existing agent directory backed up to %s\n' "$backup"
-    git clone "$REPO_URL" "$AGENT_DIR"
-  fi
-elif [[ -e "$AGENT_DIR" ]]; then
-  backup="$AGENT_DIR.backup.$(date +%Y%m%d-%H%M%S)"
-  mv "$AGENT_DIR" "$backup"
-  printf 'Existing agent directory backed up to %s\n' "$backup"
-  git clone "$REPO_URL" "$AGENT_DIR"
+log "Updating installer source (separate from Pi runtime)"
+[[ "$SOURCE_DIR" != "$AGENT_DIR" ]] || die "Source and runtime directories must differ."
+mkdir -p "$(dirname "$SOURCE_DIR")"
+if [[ -d "$SOURCE_DIR/.git" ]]; then
+  origin="$(git -C "$SOURCE_DIR" remote get-url origin)"
+  [[ "$origin" == "$REPO_URL" || "$origin" == "$REPO_URL.git" ]] || die "Unexpected source repository: $SOURCE_DIR"
+  [[ -z "$(git -C "$SOURCE_DIR" status --porcelain)" ]] || die "Source checkout has local changes; preserve them before updating: $SOURCE_DIR"
+  git -C "$SOURCE_DIR" pull --ff-only
+elif [[ -e "$SOURCE_DIR" ]]; then
+  die "Source path already exists without expected Git repository: $SOURCE_DIR"
 else
-  git clone "$REPO_URL" "$AGENT_DIR"
+  git clone "$REPO_URL" "$SOURCE_DIR"
 fi
 
+log "Installing managed runtime files; preserving credentials and sessions"
+node "$SOURCE_DIR/scripts/configure-runtime.mjs" "$SOURCE_DIR" "$AGENT_DIR" "$PI_SETUP_DAILY_WORKFLOW"
+
 install_home_agents() {
-  local source="$AGENT_DIR/home/AGENTS.md" target="$HOME/AGENTS.md" backup
+  local source="$SOURCE_DIR/home/AGENTS.md" target="$HOME/AGENTS.md" backup
   [[ -f "$source" ]] || die "Missing home AGENTS.md template: $source"
   if [[ -e "$target" ]] && ! cmp -s "$source" "$target"; then
-    backup="$target.backup.$(date +%Y%m%d-%H%M%S)"
-    cp -a "$target" "$backup"
-    printf 'Existing home AGENTS.md backed up to %s\n' "$backup"
+    printf 'Keeping existing host-specific home guidance: %s\n' "$target"
+    return
   fi
   cmp -s "$source" "$target" 2>/dev/null || install -m 644 "$source" "$target"
 }
@@ -162,7 +188,7 @@ log "Installing home AGENTS.md"
 install_home_agents
 
 install_tmux_config() {
-  local source="$AGENT_DIR/home/tmux.conf" target="$HOME/.tmux.conf" backup terminal popup=false validate_socket validation_output
+  local source="$SOURCE_DIR/home/tmux.conf" target="$HOME/.tmux.conf" backup terminal popup=false validate_socket validation_output
   [[ -f "$source" ]] || die "Missing tmux template: $source"
   if ! command -v tmux >/dev/null; then
     printf 'tmux not installed; skipping tmux configuration.\n'
@@ -235,13 +261,13 @@ configure_router() {
   url="${NINEROUTER_URL:-}"
   key="${NINEROUTER_KEY:-}"
   if [[ -z "$url" ]]; then
-    [[ -r "$tty" && -w "$tty" ]] || die "No terminal available. Export NINEROUTER_URL before running installer."
+    ( : <> "$tty" ) 2>/dev/null || die "No terminal available. Export NINEROUTER_URL before running installer."
     read -r -p "9Router URL [http://localhost:20128]: " url < "$tty"
     url="${url:-http://localhost:20128}"
   fi
   url="${url%/}"
 
-  if [[ -z "$key" && -r "$tty" && -w "$tty" ]]; then
+  if [[ -z "$key" ]] && ( : <> "$tty" ) 2>/dev/null; then
     read -r -s -p "9Router key (leave empty when auth is disabled): " key < "$tty"
     printf '\n' > "$tty"
   fi
@@ -261,9 +287,13 @@ configure_router
 log "Installing configured Pi packages"
 pi update --extensions
 
+if [[ "$PI_SETUP_OVIS" == 1 ]]; then
+  bash "$SOURCE_DIR/scripts/install-ovis.sh" "$OVIS_VERSION"
+fi
+
 log "Verifying installation"
 printf 'Node.js: %s\n' "$(node --version)"
 printf 'Pi:      %s\n' "$(pi --version)"
-printf 'qmd:     %s\n' "$(qmd --version 2>/dev/null || printf 'installed')"
+printf 'qmd:     %s\n' "$(qmd --version 2>/dev/null || printf 'not installed (optional)')"
 printf 'Herdr:   %s\n' "$(herdr --version)"
 printf '\nSetup complete. Run: cd /path/to/project && pi\n'
