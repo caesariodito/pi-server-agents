@@ -53,6 +53,8 @@ No flags authorize Tailscale configuration, public binding, relay, pairing, or r
 
 Daily workflow adds pinned `rpiv-ask-user-question@2.12.0`, `rpiv-todo@2.12.0`, and `pi-web-access@0.45.0`, plus curated lifecycle, project-init, Herdr, security-audit, frontend craft, and optional review skills. No Mac browser profiles, credentials, caches, installed dependencies, or machine .NET instructions. HTML review tools require Python 3 when used; Mermaid remains a separately installed optional pinned dependency, never a base installer step. Full audits still require independent authorized agents and strict OS sandbox controls; installing the skill does not provision these.
 
+Missing Bun installation requires `unzip`; installer reports missing prerequisite instead of installing OS packages or invoking sudo. Install it separately with explicit approval.
+
 Ovis uses Herdr plugin **v0.4.21** on first installation and installs missing Bun **1.4.0**. Existing Bun must be >=1.4.0. Existing Ovis checkout/config remains user-owned; installer does not replace or update it. Public/custom listener or relay configuration stops automatic setup for manual review. Fresh listener is `127.0.0.1:7317`.
 
 ## Source and runtime layout
@@ -86,6 +88,8 @@ Installer never starts or restarts Herdr server. If absent, Ovis install reports
 ```bash
 export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 # Load nvm in this shell if Pi is installed there.
+# For legacy managed Pi, ensure selected `pi --version` is >=1.4.0.
+# An old ~/.pi/agent/bin/pi can shadow the newer nvm/npm executable.
 herdr
 ```
 

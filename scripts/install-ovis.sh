@@ -8,6 +8,7 @@ minimum() {
 minimum "$(herdr --version)" 0.9.0 || fail 'Herdr >=0.9.0 required; upgrade explicitly. Existing server was not restarted.'
 export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 if ! command -v bun >/dev/null; then
+  command -v unzip >/dev/null || fail 'Missing unzip required by Bun installer. Install unzip with approved OS package manager, then rerun; no packages installed automatically.'
   installer="$(mktemp)"
   trap 'rm -f "$installer"' EXIT
   curl -fsSL https://bun.sh/install -o "$installer"

@@ -109,4 +109,14 @@ Spec review: local criteria covered by runnable checks and inspection. Fresh sou
 
 ## Remaining handoff
 
-Provide VM OS/architecture and authorized access or run README VM checklist manually. Code must be published or copied to VM before remote main installer can use these uncommitted changes. Do not run unchanged remote installer expecting this feature set. Confirm commit/push or VM deployment separately before delivery to remote main.
+Provide VM OS/architecture and authorized access or run README VM checklist manually. Code must be published or copied to VM before remote main installer can use these uncommitted changes. Do not run unchanged remote installer expecting this feature set. User subsequently authorized commit/push and testing on dito-asus-laptop. Commit `f81b086` pushed to main using already-authenticated owner account; original active GitHub account restored afterward.
+
+### dito-asus-laptop evidence
+
+- Ubuntu 26.04.1 LTS, x86_64, non-root user dito. Existing Herdr 0.9.5 running; existing host services not restarted. Port 7317 absent before tests.
+- Cloned published source into ~/.local/share/pi-server-agents. All 76 tests passed on Linux; both Python smoke tests passed.
+- Existing managed Pi 0.87.1 correctly rejected by missing mode. Installed npm Pi 1.4.0 alongside old managed release; did not remove/update old release. Existing PATH can select old launcher; README calls out explicit version check.
+- Daily migration and second installer run passed. Exact four package declarations verified. Gateway discovery through `pi --list-models` succeeded without sending a prompt or consuming chat inference. Custom local models.json preserved with warning.
+- Host ~/AGENTS.md preserved; checksum remained `6a61aa855133ada4ff047d7f91f7016ac044eea530b39ee345f8350ef6a64a39`. Installer amended before initial commit to preserve existing host-specific guidance rather than replace it.
+- Ovis blocked before Bun installation because unzip absent. User authorized scoped apt installation, but `sudo -n` reported `interactive authentication is required`. No sudo password requested/handled; no OS package installed. Added explicit Bun unzip prerequisite check and documentation.
+- Bun/Ovis, real Herdr Pi session, phone pairing/dialogs/reconnect, reboot/service and backup restore remain unverified. No Tailscale/relay/public listener changes. Linux regression verification is not fresh-VM or full mobile acceptance.
