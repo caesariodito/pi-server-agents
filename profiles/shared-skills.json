@@ -1,5 +1,5 @@
 {
-  "source": "git:github.com/caesariodito/skills@a0663bd8c2eab274843959477587dcba024fee72",
+  "source": "git:github.com/caesariodito/skills@406247abb8317e0e58574343279eba75485a4c54",
   "base": [
     "server-operations",
     "9router",
@@ -14,7 +14,12 @@
     "technical-spec",
     "decision-sheet",
     "html-test-cases",
-    "security-audit"
+    "security-audit",
+    "unslop",
+    "teach",
+    "architect",
+    "arena",
+    "independent-review"
   ],
   "legacyGatewayHashes": {
     "9router": "5093d0080c388fd654d2b5aa89e52ed253008da95f0f707255de87678b01deda",
