@@ -59,10 +59,10 @@ save(join(agent, 'AGENTS.md'), runtime + dailyGuidance);
 // An old override wins over AGENTS.md; leave it intact and report instead of silently ignoring policy.
 if (existsSync(join(agent, 'AGENTS.override.md'))) console.warn('WARNING: existing AGENTS.override.md overrides managed guidance; review it before starting Pi.');
 if (models) {
-  // Migrate only exact legacy repository config; preserve unrelated user overrides.
+  // Repair prior empty migrations or migrate exact legacy config; preserve unrelated user overrides.
   const legacy = models.providers?.['9router'];
-  if (legacy?.baseUrl === 'http://100.70.192.32:20128/v1' && Object.keys(models.providers).length === 1 && Object.keys(legacy).every(k => ['baseUrl', 'apiKey'].includes(k))) {
-    save(modelsPath, '{}\n');
+  if (Object.keys(models).length === 0 || (legacy?.baseUrl === 'http://100.70.192.32:20128/v1' && Object.keys(models.providers).length === 1 && Object.keys(legacy).every(k => ['baseUrl', 'apiKey'].includes(k)))) {
+    save(modelsPath, '{"providers":{}}\n');
   } else if (legacy) console.warn('WARNING: existing models.json overrides 9Router extension; review endpoint/auth settings before starting Pi.');
 }
 copyTree(join(source, 'extensions'), join(agent, 'extensions'));

@@ -51,8 +51,29 @@ test('runtime profile opt-in, reruns and legacy migration preserve private/user 
     assert.equal(readFileSync(join(agent,'auth.json'),'utf8'),'private-auth');
     assert.equal(readFileSync(join(agent,'unknown'),'utf8'),'keep');
     assert.ok(existsSync(join(agent,'.git')));
-    assert.deepEqual(JSON.parse(readFileSync(join(agent,'models.json'))),{});
+    assert.deepEqual(JSON.parse(readFileSync(join(agent,'models.json'))),{providers:{}});
   }finally{rmSync(home,{recursive:true,force:true});}
+});
+test('empty migration repair is backed up and idempotent; custom providers stay unchanged',()=>{
+  for(const initial of [{}, {providers:{}}, {providers:{custom:{baseUrl:'https://example.com/v1'}}}]){
+    const home=temp(), agent=join(home,'agent');
+    try{
+      mkdirSync(agent);
+      const original=JSON.stringify(initial);
+      writeFileSync(join(agent,'models.json'),original);
+      let result=configure(home);assert.equal(result.status,0,result.stderr);
+      const expected=Object.keys(initial).length===0 ? {providers:{}} : initial;
+      assert.deepEqual(JSON.parse(readFileSync(join(agent,'models.json'))),expected);
+      const backups=()=>readdirSync(agent).filter(p=>p.startsWith('models.json.backup.'));
+      const before=backups();
+      assert.equal(before.length,Object.keys(initial).length===0 ? 1 : 0);
+      if(before.length)assert.equal(readFileSync(join(agent,before[0]),'utf8'),original);
+      else assert.equal(readFileSync(join(agent,'models.json'),'utf8'),original);
+      result=configure(home);assert.equal(result.status,0,result.stderr);
+      assert.deepEqual(backups(),before);
+      assert.deepEqual(JSON.parse(readFileSync(join(agent,'models.json'))),expected);
+    }finally{rmSync(home,{recursive:true,force:true});}
+  }
 });
 test('invalid settings stop before managed runtime writes',()=>{
   const home=temp(), agent=join(home,'agent');
