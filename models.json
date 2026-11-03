@@ -1,8 +1,0 @@
-{
-  "providers": {
-    "9router": {
-      "baseUrl": "http://100.70.192.32:20128/v1",
-      "apiKey": "!bash -lc '. \"$HOME/.config/9router/env\"; printf %s \"$NINEROUTER_KEY\"'"
-    }
-  }
-}

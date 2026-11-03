@@ -1,45 +1,20 @@
-# AGENTS.md
+# Repository guidance
 
-Repo purpose: version Pi agent setup for `pi-server-agents`.
+Portable Pi installer and runtime composition, not global agent workflow authority. Shared workflows live in https://github.com/caesariodito/skills; profiles/shared-skills.json pins reviewed source and selected resources.
 
-## Track
+- Read install.sh, scripts/configure-runtime.mjs, tests, and README before changes. Keep source checkout separate from private runtime.
+- Prefer Pi package references over vendored skills/packages. Update shared source first, verify it, then bump exact commit here. Preserve licenses/provenance upstream.
+- Never track credentials, sessions, logs, caches, generated model catalogs, installed packages, or scratch output. Review git status --short --ignored before commits.
+- Preserve user settings, unknown runtime files, auth/session state, and host-specific ~/AGENTS.md. Changed managed files need backups. Never run real installers or manage live services during fixture tests.
+- Keep host policy separate from server-operations procedures; Homepage labels apply only where read-only discovery is configured.
+- Commit/push only when explicitly authorized. Use Conventional Commits. Do not infer permission to deploy from permission to publish source.
 
-Keep small, useful config in git:
-- `settings.json`
-- `models.json`
-- `models-store.json`
-- `skills/`
-- package/resource manifests when added
-- docs: `README.md`, `AGENTS.md`, `home/AGENTS.md`
+Checks:
 
-## Do not track
+```sh
+bash -n install.sh scripts/install-ovis.sh
+node --test tests/*.test.mjs
+git diff --check
+```
 
-Never commit secrets or private runtime data:
-- `auth.json`
-- `.env`, `.env.*`
-- `sessions/`
-- logs/cache/temp dirs
-- installed package clones/caches (`npm/`, `git/`) unless explicitly requested
-
-## Change rules
-
-- Prefer settings/package refs over vendored installed packages.
-- Keep diffs minimal.
-- Use existing Pi package/install mechanisms when possible.
-- Preserve Homepage Docker auto-discovery rules from `/home/dito/AGENTS.md` and tracked `home/AGENTS.md`. User-facing Docker services need `homepage.*` Compose labels; infrastructure-only containers stay unlabeled.
-- After changing tracked setup, use Conventional Commits and run:
-  ```bash
-  git status --short --ignored
-  git add <changed-files>
-  git commit -m '<type>(<scope>): <short message>'
-  git push
-  ```
-- Common commit types: `feat`, `fix`, `docs`, `chore`, `refactor`.
-- Before committing, verify ignored secrets remain ignored:
-  ```bash
-  git status --short --ignored
-  ```
-
-## Restore
-
-See `README.md` for clone/backup/env setup.
+Fresh VM, real gateway, Ovis phone/reconnect and reboot acceptance require separately authorized environment; fixture tests do not prove deployment readiness.

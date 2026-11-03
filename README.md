@@ -51,7 +51,7 @@ No flags authorize Tailscale configuration, public binding, relay, pairing, or r
 - Existing server home instructions, including Docker layout and Homepage discovery policies.
 - tmux configuration only if tmux already exists; installer never installs/upgrades tmux. Existing content preserved with one managed source line. Active tmux reload behavior retained.
 
-Daily workflow adds pinned `rpiv-ask-user-question@2.12.0`, `rpiv-todo@2.12.0`, and `pi-web-access@0.45.0`, plus curated lifecycle, project-init, Herdr, security-audit, frontend craft, and optional review skills. No Mac browser profiles, credentials, caches, installed dependencies, or machine .NET instructions. HTML review tools require Python 3 when used; Mermaid remains a separately installed optional pinned dependency, never a base installer step. Full audits still require independent authorized agents and strict OS sandbox controls; installing the skill does not provision these.
+Shared workflows install from an exact reviewed Git commit in `profiles/shared-skills.json`, using native Pi package resource filters. Base includes server-operations and shared gateway skills. Daily workflow adds pinned `rpiv-ask-user-question@2.12.0`, `rpiv-todo@2.12.0`, and `pi-web-access@0.45.0`, plus lifecycle, project-init, security-audit, frontend craft, decision-sheet, QA and optional review skills. Herdr agent skill remains separately reviewed/upstream-managed; it is not vendored here. No Mac browser profiles, credentials, caches, installed dependencies, or machine .NET instructions. HTML review tools require Python 3 when used; Mermaid remains a separately installed optional pinned dependency, never a base installer step. Full audits still require independent authorized agents and strict OS sandbox controls; installing the skill does not provision these.
 
 Missing Bun installation requires `unzip`. Selecting Ovis authorizes installing this prerequisite on apt-based hosts with `sudo -n apt-get install -y --no-install-recommends unzip` (direct apt-get when root). No automatic package-index update. If sudo needs authentication, installer stops and asks you to run `sudo apt-get install --no-install-recommends unzip` manually, then rerun. Other OS package managers remain manual.
 
@@ -65,8 +65,9 @@ Ovis uses Herdr plugin **v0.4.21** on first installation and installs missing Bu
   AGENTS.md                      # runtime guidance, not repo maintenance rules
   settings.json                  # preserved preferences + selected package pins
   extensions/                    # gateway integration
-  skills/                        # base gateway skills
-  daily-skills/                  # optional curated workflow
+  skills/                        # remaining server-specific gateway chat reference
+  git/                           # Pi-managed pinned shared skill package
+  daily-skills/                  # legacy only; retained but no longer discovered
   auth.json, sessions/, ...      # private existing state, never copied to source
 ~/.config/9router/env             # canonical server credential file
 ```
@@ -79,7 +80,7 @@ Legacy installs may already have this Git checkout in `~/.pi/agent`. Installer c
 
 Backups use `<file>.backup.<timestamp>`. Restore specific files from their backups to roll back settings/guidance; use previous source commit for code rollback. Never remove auth/session/state directories or reset legacy runtime Git checkout. Back up source and uncommitted project work independently; Herdr persistence is not a backup.
 
-Source checkout with local edits stops update instead of resetting it. Keep experiments in a separate development checkout. Changes to optional profile skill sources belong under `profiles/daily/skills`; do not copy `node_modules`.
+Source checkout with local edits stops update instead of resetting it. Keep experiments in a separate development checkout. Shared workflow changes belong in https://github.com/caesariodito/skills; verify/publish there, then bump exact commit in profiles/shared-skills.json. Do not copy skills or node_modules here. Old daily discovery path is removed without deleting files; exact former gateway copies move to retired-skills backups. Modified gateway copies block migration before managed writes for manual merge. Restore specific files/settings from backups for rollback.
 
 ## Herdr and Ovis startup
 
@@ -121,7 +122,6 @@ Inspect existing Serve configuration first; do not overwrite another service's r
 ```bash
 bash -n install.sh scripts/install-ovis.sh
 node --test tests/*.test.mjs
-node --test profiles/daily/skills/security-audit/*.test.cjs
 git diff --check
 ```
 
@@ -144,4 +144,6 @@ tmux -L pi-config-check kill-session -t validate
 
 ## Source tracking
 
-Track portable settings, source skills, templates, scripts, tests, and documentation. Never track auth, environment secrets, sessions, logs, caches, generated model catalogs, or installed package directories. Historical `models.json`, `models-store.json`, and Linux x64 `bin/` artifacts are retained for compatibility but are **not installed** into new runtime.
+Track portable settings, source references, templates, scripts, tests, and documentation. Never track auth, environment secrets, sessions, logs, caches, generated model catalogs, or installed package directories. Historical model catalogs and Linux x64 binaries were removed from current source; Git history retains them. Do not clone this repository into ~/.pi/agent. Legacy GitHub .pi repository is unnecessary; local ~/.pi remains runtime state.
+
+Canonical consolidation spec: https://github.com/caesariodito/skills/blob/main/docs/specs/workflow-consolidation/spec.md. No VPS deployment authorized by publishing these changes.

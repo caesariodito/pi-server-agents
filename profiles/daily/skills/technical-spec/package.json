@@ -1,8 +1,0 @@
-{
-  "private": true,
-  "type": "module",
-  "description": "Pinned offline Mermaid engine for local review previews",
-  "dependencies": {
-    "mermaid": "12.2.0"
-  }
-}

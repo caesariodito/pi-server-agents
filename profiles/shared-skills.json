@@ -1,0 +1,24 @@
+{
+  "source": "git:github.com/caesariodito/skills@a0663bd8c2eab274843959477587dcba024fee72",
+  "base": [
+    "server-operations",
+    "9router",
+    "9router-web-fetch",
+    "9router-web-search"
+  ],
+  "daily": [
+    "engineering-lifecycle",
+    "project-init",
+    "emil-design-eng",
+    "implementation-review",
+    "technical-spec",
+    "decision-sheet",
+    "html-test-cases",
+    "security-audit"
+  ],
+  "legacyGatewayHashes": {
+    "9router": "5093d0080c388fd654d2b5aa89e52ed253008da95f0f707255de87678b01deda",
+    "9router-web-fetch": "ae4ae3879b883b527ec88635a5ac32eec5bfd8dc0918e6b804155d947af0a2a0",
+    "9router-web-search": "fe8a0b6ac8026d11d40d4c4dafbcb9e8f6c2b594b3ebcb035e74b2f3817189cc"
+  }
+}

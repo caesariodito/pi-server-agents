@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const [sourceArg, agentArg, dailyFlag] = process.argv.slice(2);
 if (!sourceArg || !agentArg || !['0', '1'].includes(dailyFlag)) throw new Error('Usage: configure-runtime.mjs SOURCE AGENT_DIR DAILY(0|1)');
@@ -23,8 +24,10 @@ const models = existsSync(modelsPath) ? JSON.parse(readFileSync(modelsPath, 'utf
 if (models !== undefined && (!models || typeof models !== 'object' || Array.isArray(models))) throw new Error('models.json must be a JSON object');
 const marker = join(agent, '.daily-workflow');
 const daily = dailyFlag === '1' || existsSync(marker);
-const runtime = readFileSync(join(source, 'runtime/AGENTS.md'), 'utf8').replaceAll('@DAILY_SKILLS@', join(agent, 'daily-skills'));
-const dailyGuidance = daily ? '\n' + readFileSync(join(source, 'profiles/daily/AGENTS.md'), 'utf8').replaceAll('@DAILY_SKILLS@', join(agent, 'daily-skills')) : '';
+const runtime = readFileSync(join(source, 'runtime/AGENTS.md'), 'utf8');
+const dailyGuidance = daily ? '\n' + readFileSync(join(source, 'profiles/daily/AGENTS.md'), 'utf8') : '';
+const shared = JSON.parse(readFileSync(join(source, 'profiles/shared-skills.json'), 'utf8'));
+if (!/^git:github\.com\/caesariodito\/skills@[a-f0-9]{40}$/.test(shared.source) || !['base', 'daily'].every(key => Array.isArray(shared[key]) && shared[key].every(name => /^[a-z0-9-]+$/.test(name)))) throw new Error('Invalid shared skill pin or selection');
 
 function save(path, data) {
   rejectSymlinkParents(path);
@@ -42,16 +45,30 @@ function copyTree(from, to) {
     if (entry.isDirectory()) copyTree(src, dst);
     else if (entry.isFile()) {
       const data = readFileSync(src);
-      save(dst, /\.(md|mjs|py|json)$/.test(entry.name) ? data.toString().replaceAll('~/.pi/agent/daily-skills', join(agent, 'daily-skills')) : data);
+      save(dst, data);
     }
     else throw new Error(`Unsupported source entry: ${src}`);
   }
 }
-if (daily) {
-  const pins = JSON.parse(readFileSync(join(source, 'profiles/daily/packages.json'), 'utf8'));
-  const identity = spec => typeof spec === 'string' ? spec.replace(/@[^/@]+$/, '') : identity(spec.source);
-  settings.packages = [...(settings.packages ?? []).filter(spec => !pins.some(pin => identity(pin) === identity(spec))), ...pins];
-  settings.skills = [...new Set([...(settings.skills ?? []), join(agent, 'daily-skills')])];
+const pins = daily ? JSON.parse(readFileSync(join(source, 'profiles/daily/packages.json'), 'utf8')) : [];
+const identity = spec => {
+  const value = typeof spec === 'string' ? spec : spec?.source;
+  if (typeof value !== 'string') throw new Error('Invalid package declaration');
+  return value.replace(/@[^/@]+$/, '').replace(/^git:github\.com\//, 'https://github.com/').replace(/\.git$/, '').replace(/\/$/, '');
+};
+const managed = [...pins, shared.source];
+const selected = [...shared.base, ...(daily ? shared.daily : [])];
+settings.packages = [...(settings.packages ?? []).filter(spec => !managed.some(pin => identity(pin) === identity(spec))), ...pins, { source: shared.source, skills: selected.map(name => `${name}/SKILL.md`), extensions: [], prompts: [], themes: [] }];
+// Preserve legacy files for rollback, but stop loading the old managed snapshot.
+if (settings.skills) settings.skills = settings.skills.filter(path => ![join(agent, 'daily-skills'), '~/.pi/agent/daily-skills'].includes(path));
+const legacyGateway = [];
+for (const [name, hash] of Object.entries(shared.legacyGatewayHashes)) {
+  if (!/^9router(?:-web-fetch|-web-search)?$/.test(name) || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid legacy skill manifest');
+  const old = join(agent, 'skills', name);
+  if (!existsSync(old)) continue;
+  rejectSymlinkParents(join(old, 'SKILL.md'));
+  if (readdirSync(old).length !== 1 || createHash('sha256').update(readFileSync(join(old, 'SKILL.md'))).digest('hex') !== hash) throw new Error(`Local gateway skill differs from former managed source; preserve and merge before migration: ${old}`);
+  legacyGateway.push([name, old]);
 }
 // Read/validate settings before replacing any managed runtime file.
 save(settingsPath, JSON.stringify(settings, null, 2) + '\n');
@@ -65,10 +82,14 @@ if (models) {
     save(modelsPath, '{"providers":{}}\n');
   } else if (legacy) console.warn('WARNING: existing models.json overrides 9Router extension; review endpoint/auth settings before starting Pi.');
 }
+// Retire only former installer-owned gateway directories, preserving contents for rollback.
+for (const [name, old] of legacyGateway) {
+  const retired = join(agent, 'retired-skills', `${name}.backup.${stamp}`);
+  rejectSymlinkParents(retired);
+  mkdirSync(dirname(retired), { recursive: true });
+  renameSync(old, retired);
+}
 copyTree(join(source, 'extensions'), join(agent, 'extensions'));
 copyTree(join(source, 'skills'), join(agent, 'skills'));
-if (daily) {
-  copyTree(join(source, 'profiles/daily/skills'), join(agent, 'daily-skills'));
-  save(marker, 'enabled\n');
-}
+if (daily) save(marker, 'enabled\n');
 console.log(`Runtime configured: ${agent}; daily workflow: ${daily ? 'enabled' : 'unchanged/off'}`);

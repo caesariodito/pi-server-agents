@@ -5,17 +5,12 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 const source = resolve(import.meta.dirname, '..');
-test('curated skill entrypoints and local skill links are portable',()=>{
-  const root=join(source,'profiles/daily/skills');
-  for(const entry of readdirSync(root)){
-    const path=join(root,entry,'SKILL.md'), text=readFileSync(path,'utf8');
-    assert.match(text,/^name: [a-z0-9-]+$/m);assert.match(text,/^description:/m);
-    assert.ok(!/\/Users\/wolter|~\/\.dotfiles/.test(text));
-    for(const match of text.matchAll(/\]\(([^)]+)\)/g)){
-      const target=match[1].split('#')[0];
-      if(target&&!target.includes('://')&&!target.startsWith('/'))assert.ok(existsSync(resolve(root,entry,target)),`${entry}: ${target}`);
-    }
-  }
+const shared = JSON.parse(readFileSync(join(source,'profiles/shared-skills.json'),'utf8'));
+test('shared skill dependency uses exact reviewed commit and explicit profiles',()=>{
+  assert.match(shared.source,/^git:github\.com\/caesariodito\/skills@[a-f0-9]{40}$/);
+  assert.ok(shared.base.includes('server-operations'));
+  assert.ok(shared.daily.includes('engineering-lifecycle'));
+  for (const name of shared.daily) assert.ok(!existsSync(join(source,'profiles/daily/skills',name,'SKILL.md')));
 });
 const temp = () => mkdtempSync(join(tmpdir(), 'pi-setup-test-'));
 function run(command, args, env={}) {
@@ -35,7 +30,8 @@ test('runtime profile opt-in, reruns and legacy migration preserve private/user 
     writeFileSync(join(agent,'settings.json'),JSON.stringify({theme:'custom',packages:['npm:pi-memory@0.4.2','npm:mine@1.0.0'],skills:[]}));
     let result=configure(home);assert.equal(result.status,0,result.stderr);
     let settings=JSON.parse(readFileSync(join(agent,'settings.json')));
-    assert.equal(settings.theme,'custom');assert.equal(settings.packages.length,2);
+    assert.equal(settings.theme,'custom');assert.equal(settings.packages.length,3);
+    assert.deepEqual(settings.packages.at(-1).skills,shared.base.map(name=>`${name}/SKILL.md`));
     assert.ok(!existsSync(join(agent,'daily-skills')));
     assert.ok(!readFileSync(join(agent,'AGENTS.md'),'utf8').includes('git push'));
     assert.ok(readdirSync(agent).some(p=>p.startsWith('AGENTS.md.backup.')));
@@ -43,8 +39,8 @@ test('runtime profile opt-in, reruns and legacy migration preserve private/user 
     settings=JSON.parse(readFileSync(join(agent,'settings.json')));
     assert.ok(settings.packages.includes('npm:pi-web-access@0.45.0'));
     assert.ok(settings.packages.includes('npm:mine@1.0.0'));
-    assert.ok(existsSync(join(agent,'daily-skills/security-audit/SKILL.md')));
-    assert.ok(readFileSync(join(agent,'daily-skills/engineering-lifecycle/SKILL.md'),'utf8').includes(join(agent,'daily-skills/project-init/references/')));
+    assert.ok(!existsSync(join(agent,'daily-skills')));
+    assert.deepEqual(settings.packages.at(-1).skills,[...shared.base,...shared.daily].map(name=>`${name}/SKILL.md`));
     const before=readFileSync(join(agent,'settings.json'),'utf8');
     result=configure(home,'0');assert.equal(result.status,0,result.stderr);
     assert.equal(readFileSync(join(agent,'settings.json'),'utf8'),before);
@@ -74,6 +70,45 @@ test('empty migration repair is backed up and idempotent; custom providers stay 
       assert.deepEqual(JSON.parse(readFileSync(join(agent,'models.json'))),expected);
     }finally{rmSync(home,{recursive:true,force:true});}
   }
+});
+test('legacy snapshot discovery migrates without deleting files or duplicating shared package',()=>{
+  const home=temp(),agent=join(home,'agent');
+  try{
+    mkdirSync(join(agent,'daily-skills/custom'),{recursive:true});
+    writeFileSync(join(agent,'daily-skills/custom/SKILL.md'),'keep-local');
+    writeFileSync(join(agent,'.daily-workflow'),'enabled\n');
+    writeFileSync(join(agent,'settings.json'),JSON.stringify({skills:[join(agent,'daily-skills'),'~/.pi/agent/daily-skills','/custom/skills'],packages:[{source:'https://github.com/caesariodito/skills@old',skills:['*']},'npm:mine@1.0.0']}));
+    for(let i=0;i<2;i++){
+      const r=configure(home);assert.equal(r.status,0,r.stderr);
+      const settings=JSON.parse(readFileSync(join(agent,'settings.json'),'utf8'));
+      assert.deepEqual(settings.skills,['/custom/skills']);
+      assert.equal(settings.packages.filter(p=>typeof p==='object'&&p.source.includes('caesariodito/skills')).length,1);
+      assert.equal(readFileSync(join(agent,'daily-skills/custom/SKILL.md'),'utf8'),'keep-local');
+    }
+  }finally{rmSync(home,{recursive:true,force:true});}
+});
+test('exact former gateway moves outside discovery with contents preserved',()=>{
+  const home=temp(),agent=join(home,'agent');
+  try{
+    const original=spawnSync('git',['-C',source,'show','833318e9edbb0fe4bee5f208e3b0dce2d35e9296:skills/9router/SKILL.md'],{encoding:'utf8'});
+    assert.equal(original.status,0,original.stderr);
+    mkdirSync(join(agent,'skills/9router'),{recursive:true});
+    writeFileSync(join(agent,'skills/9router/SKILL.md'),original.stdout);
+    const r=configure(home);assert.equal(r.status,0,r.stderr);
+    assert.ok(!existsSync(join(agent,'skills/9router')));
+    const backup=readdirSync(join(agent,'retired-skills'))[0];
+    assert.equal(readFileSync(join(agent,'retired-skills',backup,'SKILL.md'),'utf8'),original.stdout);
+  }finally{rmSync(home,{recursive:true,force:true});}
+});
+test('modified legacy gateway blocks before runtime writes',()=>{
+  const home=temp(),agent=join(home,'agent');
+  try{
+    mkdirSync(join(agent,'skills/9router'),{recursive:true});
+    writeFileSync(join(agent,'skills/9router/SKILL.md'),'custom');
+    const r=configure(home);assert.notEqual(r.status,0);assert.match(r.stderr,/differs from former managed source/);
+    assert.ok(!existsSync(join(agent,'settings.json')));
+    assert.equal(readFileSync(join(agent,'skills/9router/SKILL.md'),'utf8'),'custom');
+  }finally{rmSync(home,{recursive:true,force:true});}
 });
 test('invalid settings stop before managed runtime writes',()=>{
   const home=temp(), agent=join(home,'agent');
@@ -127,7 +162,9 @@ test('full installer combinations preserve runtime and refuse dirty source',()=>
       for(let i=0;i<2;i++){
         const r=run('bash',[runner],config);assert.equal(r.status,0,r.stderr);
       }
-      const agent=join(home,'.pi/agent');assert.equal(existsSync(join(agent,'daily-skills')),daily==='1');
+      const agent=join(home,'.pi/agent');assert.ok(!existsSync(join(agent,'daily-skills')));
+      const settings=JSON.parse(readFileSync(join(agent,'settings.json'),'utf8'));
+      assert.equal(settings.packages.at(-1).source,shared.source);
       assert.ok(!readFileSync(join(agent,'AGENTS.md'),'utf8').includes('git push'));
       const r=run('bash',[runner],{...config,DIRTY:'1'});assert.notEqual(r.status,0);assert.match(r.stderr,/local changes/);
     }finally{rmSync(home,{recursive:true,force:true});}
