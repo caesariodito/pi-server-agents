@@ -3,11 +3,11 @@
 set -Eeuo pipefail
 
 readonly PI_VERSION="1.4.0"
-readonly OVIS_VERSION="v0.4.21"
+readonly CORE_VERSION="0.1.19"
 readonly NODE_VERSION="24"
 readonly NVM_INSTALLER_VERSION="v0.40.3"
 readonly REPO_URL="https://github.com/caesariodito/pi-server-agents"
-readonly HERDR_INSTALLER_URL="https://herdr.dev/install.sh"
+readonly HERDR_INSTALLER_URL="https://releases.herdr.dev/core/install.sh"
 readonly AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 readonly SOURCE_DIR="$HOME/.local/share/pi-server-agents"
 readonly ROUTER_ENV="$HOME/.config/9router/env"
@@ -71,14 +71,14 @@ choose_feature() {
 }
 
 # Validate flags before even root confirmation or tool installation.
-for flag in PI_SETUP_DAILY_WORKFLOW PI_SETUP_OVIS PI_SETUP_QMD; do
+[[ "${PI_SETUP_OVIS:-0}" == 0 ]] || die "PI_SETUP_OVIS is retired; use Heeler over SSH with herdr-core."
+for flag in PI_SETUP_DAILY_WORKFLOW PI_SETUP_QMD; do
   case "${!flag:-}" in ''|0|1) ;; *) die "$flag must be 0 or 1." ;; esac
 done
 case "${PI_SETUP_MODE:-}" in ''|missing|reinstall) ;; *) die "PI_SETUP_MODE must be 'missing' or 'reinstall'." ;; esac
 confirm_root_install
 choose_setup_mode
 choose_feature PI_SETUP_DAILY_WORKFLOW 'Install daily coding workflow?'
-choose_feature PI_SETUP_OVIS 'Install Ovis for mobile access (includes missing Bun and apt unzip; no network exposure)?'
 choose_feature PI_SETUP_QMD 'Install optional qmd search tool?'
 readonly SETUP_MODE
 printf 'Setup mode: %s\n' "$SETUP_MODE"
@@ -143,14 +143,15 @@ else
 fi
 
 export PATH="$HOME/.local/bin:$PATH"
-if [[ "$SETUP_MODE" == reinstall ]] || ! command -v herdr >/dev/null; then
-  log "Installing Herdr"
+if ! command -v herdr-core >/dev/null; then
+  log "Installing Herdr Core"
   herdr_installer="$(mktemp)"
   curl -fsSL "$HERDR_INSTALLER_URL" -o "$herdr_installer"
-  HERDR_INSTALL_DIR="$HOME/.local/bin" sh "$herdr_installer"
+  HC_VERSION="$CORE_VERSION" HC_INSTALL_DIR="$HOME/.local/bin" sh "$herdr_installer"
   rm -f "$herdr_installer"
 else
-  log "Keeping existing Herdr"
+  version_at_least "$(herdr-core --version)" "$CORE_VERSION" || die "Existing herdr-core must be >= $CORE_VERSION; upgrade explicitly."
+  log "Keeping existing Herdr Core; no automatic restart or update"
 fi
 grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.profile" || cat >> "$HOME/.profile" <<'EOF'
 
@@ -287,13 +288,10 @@ configure_router
 log "Installing configured Pi packages"
 pi update --extensions
 
-if [[ "$PI_SETUP_OVIS" == 1 ]]; then
-  bash "$SOURCE_DIR/scripts/install-ovis.sh" "$OVIS_VERSION"
-fi
-
 log "Verifying installation"
 printf 'Node.js: %s\n' "$(node --version)"
 printf 'Pi:      %s\n' "$(pi --version)"
 printf 'qmd:     %s\n' "$(qmd --version 2>/dev/null || printf 'not installed (optional)')"
-printf 'Herdr:   %s\n' "$(herdr --version)"
+printf 'Core:    %s\n' "$(herdr-core --version)"
+printf 'Heeler: add this host manually as herdr-core over SSH; no Ovis plugin or listener installed.\n'
 printf '\nSetup complete. Run: cd /path/to/project && pi\n'

@@ -123,29 +123,21 @@ test('invalid flags fail before tool installers and root prompts',()=>{
     assert.notEqual(r.status,0);assert.match(r.stderr,new RegExp(flag));assert.ok(!r.stdout.includes('Installing'));
   }
 });
-function ovisFixture(home,{version='herdr 0.9.4',bun='1.4.0',plugins='{"result":{"plugins":[]}}',running=false}={}){
+function coreFixture(home){
   const bin=join(home,'bin');mkdirSync(bin);
-  writeFileSync(join(bin,'herdr'),`#!/bin/bash\nprintf '%s\\n' "$*" >> "$HOME/calls"\ncase "$*" in\n'--version') echo '${version}' ;;\n'plugin config-dir devswha.ovis') echo "$HOME/ovis-config" ;;\n'plugin list --json') echo '${plugins}' ;;\n'status server') exit ${running?0:1} ;;\nesac\n`,{mode:0o700});
-  writeFileSync(join(bin,'bun'),`#!/bin/bash\necho '${bun}'\n`,{mode:0o700});
-  writeFileSync(join(bin,'curl'),'#!/bin/bash\necho \'{"ok":true,"herdr":{"version":"0.9.4"}}\'\n',{mode:0o700});
+  writeFileSync(join(bin,'herdr-core'),'#!/bin/bash\nprintf "%s\\n" "$*" >> "$HOME/core-calls"\necho "hc 0.1.19"\n',{mode:0o700});
   return {HOME:home,PATH:`${bin}:${process.env.PATH}`};
 }
-test('Ovis installs pinned plugin independently; no network exposure or Herdr restart',()=>{
-  for(const running of [false,true]){
-    const home=temp();try{
-      const env=ovisFixture(home,{running});const r=run('bash',[join(source,'scripts/install-ovis.sh'),'v0.4.21'],env);
-      assert.equal(r.status,0,r.stderr);const calls=readFileSync(join(home,'calls'),'utf8');
-      assert.match(calls,/plugin install --ref v0.4.21 --yes devswha\/ovis/);
-      assert.ok(!/server stop|tailscale|phone|relay/.test(calls));
-      assert.match(readFileSync(join(home,'ovis-config/env'),'utf8'),/HOST=127.0.0.1/);
-      assert.match(r.stdout,running ? /Ovis healthy/ : /Startup pending/);
-    }finally{rmSync(home,{recursive:true,force:true});}
-  }
+test('retired Ovis entrypoint fails without calling legacy tools',()=>{
+  const home=temp();try{
+    const r=run('bash',[join(source,'scripts/install-ovis.sh')],{HOME:home});
+    assert.notEqual(r.status,0);assert.match(r.stderr,/retired/);
+  }finally{rmSync(home,{recursive:true,force:true});}
 });
 test('full installer combinations preserve runtime and refuse dirty source',()=>{
-  for(const daily of ['0','1'])for(const ovis of ['0','1']){
+  for(const daily of ['0','1']){
     const home=temp();try{
-      const env=ovisFixture(home);
+      const env=coreFixture(home);
       const bin=join(home,'bin'),checkout=join(home,'.local/share/pi-server-agents');
       cpSync(source,checkout,{recursive:true,filter:path=>!path.includes('/.git')&&!path.includes('/.scratch')&&!path.includes('/__pycache__')});
       mkdirSync(join(checkout,'.git'));
@@ -158,7 +150,7 @@ test('full installer combinations preserve runtime and refuse dirty source',()=>
       tool('tmux','[[ "$1" != list-sessions ]]');
       tool('infocmp','exit 1');
       mkdirSync(join(home,'.nvm'));writeFileSync(join(home,'.nvm/nvm.sh'),'nvm() { [[ "$1" != version ]] || echo v24.0.0; return 0; }\n');
-      const config={...env,PI_SETUP_MODE:'missing',PI_SETUP_DAILY_WORKFLOW:daily,PI_SETUP_OVIS:ovis,PI_SETUP_QMD:'0',NINEROUTER_URL:'https://gateway.example',NINEROUTER_KEY:'dummy'};
+      const config={...env,PI_SETUP_MODE:'missing',PI_SETUP_DAILY_WORKFLOW:daily,PI_SETUP_OVIS:'0',PI_SETUP_QMD:'0',NINEROUTER_URL:'https://gateway.example',NINEROUTER_KEY:'dummy'};
       for(let i=0;i<2;i++){
         const r=run('bash',[runner],config);assert.equal(r.status,0,r.stderr);
       }
@@ -171,26 +163,30 @@ test('full installer combinations preserve runtime and refuse dirty source',()=>
   }
 });
 
-test('missing unzip uses scoped noninteractive sudo and stops before download when denied',()=>{
+test('Ovis opt-in fails before any installer action',()=>{
+  const r=run('bash',[join(source,'install.sh')],{PI_SETUP_OVIS:'1',HOME:'/nonexistent'});
+  assert.notEqual(r.status,0);assert.match(r.stderr,/retired/);assert.ok(!r.stdout.includes('Installing'));
+});
+test('missing core installer receives pinned version and user-local destination',()=>{
   const home=temp();try{
-    const env=ovisFixture(home);
-    writeFileSync(join(home,'bin/apt-get'),'#!/bin/bash\nexit 99\n',{mode:0o700});
-    writeFileSync(join(home,'bin/sudo'),'#!/bin/bash\nprintf "%s\\n" "$*" > "$HOME/sudo-call"\nexit 1\n',{mode:0o700});
-    const script=join(source,'scripts/install-ovis.sh');
-    const r=run('bash',['-c','command() { if [[ "$1" == -v && ( "$2" == unzip || "$2" == bun ) ]]; then return 1; fi; builtin command "$@"; }; source "$1" v0.4.21','test',script],env);
-    assert.notEqual(r.status,0);assert.match(r.stderr,/interactive authentication/);
-    assert.equal(readFileSync(join(home,'sudo-call'),'utf8').trim(),'-n apt-get install -y --no-install-recommends unzip');
-    assert.ok(!readFileSync(join(home,'calls'),'utf8').includes('plugin install'));
+    const bin=join(home,'bin');mkdirSync(bin);
+    const installer=join(home,'fake-installer.sh');
+    writeFileSync(installer,'#!/bin/sh\nset -eu\n[ "$HC_VERSION" = 0.1.19 ]\n[ "$HC_INSTALL_DIR" = "$HOME/.local/bin" ]\nmkdir -p "$HC_INSTALL_DIR"\nprintf "#!/bin/sh\\necho hc 0.1.19\\n" > "$HC_INSTALL_DIR/herdr-core"\nchmod 700 "$HC_INSTALL_DIR/herdr-core"\n');
+    writeFileSync(join(bin,'curl'),'#!/bin/sh\n[ "${FAIL_DOWNLOAD:-0}" = 0 ] || exit 7\ncp "$HOME/fake-installer.sh" "$4"\n',{mode:0o700});
+    const script=readFileSync(join(source,'install.sh'),'utf8');
+    const start=script.indexOf('export PATH="$HOME/.local/bin:$PATH"');
+    const end=script.indexOf("grep -Fq 'export PATH=",start);
+    const block=script.slice(start,end);
+    const prelude='set -eu\nCORE_VERSION=0.1.19\nHERDR_INSTALLER_URL=https://releases.herdr.dev/core/install.sh\nlog() { :; }\ndie() { echo "$*" >&2; exit 1; }\ncommand() { if [ "$1" = -v ] && [ "$2" = herdr-core ]; then [ -x "$HOME/.local/bin/herdr-core" ]; else builtin command "$@"; fi; }\n';
+    let r=run('bash',['-c',prelude+block],{HOME:home,PATH:`${bin}:${process.env.PATH}`,FAIL_DOWNLOAD:'1'});
+    assert.notEqual(r.status,0);assert.ok(!existsSync(join(home,'.local/bin/herdr-core')));
+    r=run('bash',['-c',prelude+block],{HOME:home,PATH:`${bin}:${process.env.PATH}`});
+    assert.equal(r.status,0,r.stderr);assert.ok(existsSync(join(home,'.local/bin/herdr-core')));
   }finally{rmSync(home,{recursive:true,force:true});}
 });
-
-test('Ovis refuses old tools, malformed plugin state, and existing public bind',()=>{
-  for(const options of [{version:'herdr 0.8.0'},{bun:'1.3.0'},{plugins:'{}'},{public:true}]){
-    const home=temp();try{
-      const env=ovisFixture(home,options);
-      if(options.public){mkdirSync(join(home,'ovis-config'));writeFileSync(join(home,'ovis-config/env'),'HOST=0.0.0.0\n');}
-      const r=run('bash',[join(source,'scripts/install-ovis.sh'),'v0.4.21'],env);
-      assert.notEqual(r.status,0);assert.ok(!readFileSync(join(home,'calls'),'utf8').includes('plugin install'));
-    }finally{rmSync(home,{recursive:true,force:true});}
-  }
+test('core integration has no legacy install, plugin or startup commands',()=>{
+  const script=readFileSync(join(source,'install.sh'),'utf8');
+  assert.ok(script.includes('https://releases.herdr.dev/core/install.sh'));
+  assert.ok(script.includes('HC_VERSION="$CORE_VERSION"'));
+  assert.ok(!/command -v herdr |herdr plugin|herdr server|herdr.dev\/install.sh/.test(script));
 });

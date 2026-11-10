@@ -1,6 +1,6 @@
 # pi-server-agents
 
-Portable Pi setup for a personal Linux VM, with optional daily coding workflow and optional Ovis mobile client. macOS installer paths are supported; fresh Linux VM verification remains required before production use.
+Portable Pi setup for a personal Linux VM, with optional daily coding workflow and Heeler mobile access over SSH to herdr-core. macOS installer paths are supported; fresh Linux VM verification remains required before production use.
 
 ## Install
 
@@ -21,18 +21,16 @@ Choose setup mode:
   3) Cancel
 
 Install daily coding workflow? [y/N]
-Install Ovis for mobile access (includes missing Bun; no network exposure)? [y/N]
 Install optional qmd search tool? [y/N]
 ```
 
-A noninteractive first run leaves optional features off. Enabling daily workflow persists across reruns; answering no does not uninstall it. Ovis and qmd also remain installed when declined later. Reinstall reruns selected managed installers without deleting runtime state. Root still requires typing `ROOT` through a terminal; avoid root for agent work.
+A noninteractive first run leaves optional features off. Enabling daily workflow persists across reruns; answering no does not uninstall it. qmd remains installed when declined later. Reinstall reruns selected managed installers without deleting runtime state. Root still requires typing `ROOT` through a terminal; avoid root for agent work.
 
 ### Unattended flags
 
 ```bash
 export PI_SETUP_MODE=missing               # missing or reinstall
 export PI_SETUP_DAILY_WORKFLOW=1          # 0 or 1
-export PI_SETUP_OVIS=1                    # independent from daily workflow
 export PI_SETUP_QMD=0                     # optional
 export NINEROUTER_URL="https://your-private-gateway.example"
 read -rsp '9Router key: ' NINEROUTER_KEY; export NINEROUTER_KEY; echo
@@ -45,7 +43,7 @@ No flags authorize Tailscale configuration, public binding, relay, pairing, or r
 ## What installs
 
 - Node.js 24 through nvm; Pi **1.4.0** for fresh/reinstall. Missing mode keeps compatible newer Pi, rejects older Pi with upgrade instructions.
-- Herdr if missing; optional Ovis requires Herdr >=0.9.0. Existing Herdr is not silently upgraded or restarted in missing mode.
+- herdr-core **0.1.19** if missing. Existing compatible core is never automatically updated/restarted, even in reinstall mode. Legacy `herdr` is not installed or used.
 - Existing base `pi-memory@0.4.2` declaration on fresh runtime. Existing settings/preferences/packages retained.
 - Server-compatible gateway discovery with bounded timeout and default-model fallback. No imported machine-specific generated catalog.
 - Existing server home instructions, including Docker layout and Homepage discovery policies.
@@ -53,9 +51,7 @@ No flags authorize Tailscale configuration, public binding, relay, pairing, or r
 
 Shared workflows install from an exact reviewed Git commit in `profiles/shared-skills.json`, using native Pi package resource filters. Base includes server-operations and shared gateway skills. Daily workflow adds pinned `rpiv-ask-user-question@2.12.0`, `rpiv-todo@2.12.0`, and `pi-web-access@0.45.0`, plus lifecycle, project-init, security-audit, frontend craft, decision-sheet, QA, optional review skills, and focused pstack-derived unslop/teach/architect/arena skills. Consequential work uses one independently authorized Herdr reviewer through independent-review after author verification; this is Cloudflare guidance-mode review, not full security audit. Exploration stays scoped, and human visuals are optional. Herdr agent skill remains separately reviewed/upstream-managed; it is not vendored here. No Mac browser profiles, credentials, caches, installed dependencies, or machine .NET instructions. HTML review tools require Python 3 when used; Mermaid remains a separately installed optional pinned dependency, never a base installer step. Full audits still require independent authorized agents and strict OS sandbox controls; installing the skill does not provision these.
 
-Missing Bun installation requires `unzip`. Selecting Ovis authorizes installing this prerequisite on apt-based hosts with `sudo -n apt-get install -y --no-install-recommends unzip` (direct apt-get when root). No automatic package-index update. If sudo needs authentication, installer stops and asks you to run `sudo apt-get install --no-install-recommends unzip` manually, then rerun. Other OS package managers remain manual.
-
-Ovis uses Herdr plugin **v0.4.21** on first installation and installs missing Bun **1.4.0**. Existing Bun must be >=1.4.0. Existing Ovis checkout/config remains user-owned; installer does not replace or update it. Public/custom listener or relay configuration stops automatic setup for manual review. Fresh listener is `127.0.0.1:7317`.
+Heeler uses SSH to herdr-core; no Ovis plugin, Bun prerequisite, HTTP listener or legacy Herdr installation. `PI_SETUP_OVIS=1` fails before any installation. Existing Ovis files/runtime remain untouched for deliberate retirement.
 
 ## Source and runtime layout
 
@@ -82,40 +78,21 @@ Backups use `<file>.backup.<timestamp>`. Restore specific files from their backu
 
 Source checkout with local edits stops update instead of resetting it. Keep experiments in a separate development checkout. Shared workflow changes belong in https://github.com/caesariodito/skills; verify/publish there, then bump exact commit in profiles/shared-skills.json. Do not copy skills or node_modules here. Old daily discovery path is removed without deleting files; exact former gateway copies move to retired-skills backups. Modified gateway copies block migration before managed writes for manual merge. Restore specific files/settings from backups for rollback.
 
-## Herdr and Ovis startup
+## Herdr Core and Heeler
 
-Installer never starts or restarts Herdr server. If absent, Ovis install reports startup pending. Start Herdr as the same non-root user with its tool PATH available:
-
-```bash
-export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
-# Load nvm in this shell if Pi is installed there.
-# For legacy managed Pi, ensure selected `pi --version` is >=1.4.0.
-# An old ~/.pi/agent/bin/pi can shadow the newer nvm/npm executable.
-herdr
-```
-
-Then use another terminal/pane:
+Installer does not start/restart core or configure network exposure. As the non-root user:
 
 ```bash
-herdr plugin action invoke devswha.ovis.start
-curl -fsS http://127.0.0.1:7317/api/health
+export PATH="$HOME/.local/bin:$PATH"
+herdr-core server start
+herdr-core server status
 ```
 
-An action acknowledgement is not a health check. Expect JSON `ok:true` plus Herdr details. Do not use `herdr server stop` to fix Ovis. Inspect plugin logs instead. Bun must be on the environment PATH of the Herdr server, not merely a later client shell.
+Heeler >=0.1.18: add Host manually, select **herdr-core**, use approved SSH identity and verify host fingerprint. OpenSSH stream-local forwarding must be permitted. Connecting does not start core. No legacy pairing/plugin commands. See [Heeler core guide](https://docs.heeler.bybee.dev/herdr-core).
 
-Persistent agent sessions should survive SSH disconnects; verify with your installed Herdr. Reboot startup is deliberately not installed as a privileged service here. Configure supported per-user service startup separately, with correct HOME/PATH and explicit authorization for linger/service changes. Verify reboot behavior before relying on unattended VM work.
+Keep SSH access private/restricted. No Ovis port, relay or Tailscale Serve route is needed. Phone keys, pairing, notifications and optional host helper are separate choices. Never copy credentials into source.
 
-## Private phone access — separate authorization
-
-**Ovis can control terminals. Keep port 7317 off the public Internet. Network access must be explicitly approved and protected before enabling it.**
-
-Recommended: Tailscale on VM and phone, HTTPS Serve to loopback, access restricted to intended devices/logins. With permission to change Tailscale Serve configuration:
-
-```bash
-tailscale serve --bg --https=443 http://127.0.0.1:7317
-```
-
-Inspect existing Serve configuration first; do not overwrite another service's route. Open the resulting HTTPS address on phone. Follow [Ovis phone setup and access policy](https://github.com/devswha/ovis/blob/v0.4.21/INSTALL.md#5-optional-phone-or-remote-access), including device pairing where required. Tokens belong only in private plugin config, never logs or source. Do not disable authentication to solve connection problems. Do not enable Ovis relay implicitly.
+Reboot startup needs explicitly approved per-user systemd setup and linger; `.infra` owns that host configuration. Verify reboot and reconnect before relying on it. Root-owned existing sessions are not automatically migrated.
 
 ## Validation
 
@@ -134,9 +111,9 @@ tmux -L pi-config-check kill-session -t validate
 
 ### VM acceptance checklist — not yet verified
 
-1. Fresh non-root Linux install, base-only and daily+Ovis options; rerun without duplicate config or private-state loss.
-2. Gateway reachable from VM; Pi starts with selected model inside Herdr.
-3. Ovis health passes; phone connects over restricted private HTTPS.
+1. Fresh non-root Linux install, base-only and daily workflow options; rerun without duplicate config or private-state loss.
+2. Gateway reachable from VM; Pi starts with selected model inside herdr-core.
+3. herdr-core health passes; Heeler connects over private SSH with verified host key.
 4. Pi custom question/task dialogs and approvals render correctly; terminal fallback works.
 5. Phone/SSH disconnect and reconnect preserve ongoing agent work.
 6. Supported startup procedure survives reboot with correct user, HOME, PATH, and state.
